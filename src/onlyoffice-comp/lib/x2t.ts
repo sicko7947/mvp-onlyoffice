@@ -2,8 +2,8 @@ import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
 import { editorManager } from './editor-manager';
-import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID } from './const';
-import { saveEventBus, SaveDocumentData } from './eventbus';
+import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID, EVENT_KEYS } from './const';
+import { eventBus } from './eventbus';
 
 declare global {
   interface Window {
@@ -622,7 +622,7 @@ interface SaveEvent {
 
 
 // 保存 文档数据到本地
-async function handleSaveDocument(event: SaveEvent): Promise<SaveDocumentData | null> {
+async function handleSaveDocument(event: SaveEvent): Promise<any> {
   if (event.data && event.data.data) {
     const { data, option } = event.data;
     const { fileName } = getDocmentObj() || {};
@@ -689,7 +689,7 @@ async function handleSaveDocument(event: SaveEvent): Promise<SaveDocumentData | 
     };
 
     // 通过 eventbus 通知
-    saveEventBus.emit(result);
+    eventBus.emit(EVENT_KEYS.SAVE_DOCUMENT, result);
 
     return result;
   }
@@ -785,12 +785,12 @@ export function createEditorInstance(config: {
       onAppReady: () => {
         // 直接使用 editor 实例，因为此时编辑器还未注册到管理器
         // 设置媒体资源
-        if (media) {
-          editor.sendCommand({
-            command: 'asc_setImageUrls',
-            data: { urls: media },
-          });
-        }
+        // if (media) {
+        //   editor.sendCommand({
+        //     command: 'asc_setImageUrls',
+        //     data: { urls: media },
+        //   });
+        // }
 
         // 加载文档内容
         editor.sendCommand({
@@ -800,6 +800,11 @@ export function createEditorInstance(config: {
       },
       onDocumentReady: () => {
         console.log('文档加载完成：', fileName);
+        // 触发 documentReady 事件
+        eventBus.emit(EVENT_KEYS.DOCUMENT_READY, {
+          fileName,
+          fileType,
+        });
       },
 
       // core: 下载
