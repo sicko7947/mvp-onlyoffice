@@ -1,7 +1,7 @@
 
 ## todo
 
-只读 切换到 编辑的逻辑，目前是销毁 only office 实例，然后重新挂载，目前有闪烁问题，后面再看着解决吧
+
 
 ## 说明
 ref: https://api.onlyoffice.com/docs/plugin-and-macros/interacting-with-editors/text-document-api/Enumeration/DocumentEditingRestrictions/
