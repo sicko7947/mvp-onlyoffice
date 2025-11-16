@@ -7,6 +7,7 @@ interface DocEditor {
   destroyEditor: () => void;
 }
 import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID } from './const';
+import { saveEventBus, SaveDocumentData } from './eventbus';
 // DocsAPI 类型定义
 declare global {
   interface Window {
@@ -236,29 +237,42 @@ class EditorManager {
   }
 
   // 导出文档（通过保存事件触发下载）
-  export(): void {
+  async export(): Promise<SaveDocumentData> {
     const editor = this.get();
     if (!editor) {
-      console.error('Editor not available for export');
-      return;
+      throw new Error('Editor not available for export');
     }
 
     console.log('Triggering export via asc_save command');
     
-    // 尝试多种方式触发保存
-    try {
-      // 方式3: 如果编辑器有 downloadAs 方法，尝试使用
-      if ((editor as any).downloadAs) {
+    // 返回 Promise，等待 saveEventBus 通知
+    return new Promise<SaveDocumentData>((resolve, reject) => {
+      // 设置超时，避免无限等待
+      const timeout = setTimeout(() => {
+        saveEventBus.off(handleSave);
+        reject(new Error('Export timeout: no data received'));
+      }, 3000); // 3秒超时
+
+      // 监听保存事件
+      const handleSave = (data: SaveDocumentData) => {
+        clearTimeout(timeout);
+        saveEventBus.off(handleSave);
+        resolve(data);
+      };
+
+      saveEventBus.on(handleSave);
+
+      // 触发保存
+      try {
         console.log('Trying downloadAs method');
-        const config = this.editorConfig;
-        if (config) {
-          const fileExt = config.fileType.toLowerCase();
-          (editor as any).downloadAs(fileExt);
-        }
+        (editor as any).downloadAs();
+      } catch (error) {
+        clearTimeout(timeout);
+        saveEventBus.off(handleSave);
+        console.error('Failed to send asc_save command:', error);
+        reject(error);
       }
-    } catch (error) {
-      console.error('Failed to send asc_save command:', error);
-    }
+    });
   }
 }
 

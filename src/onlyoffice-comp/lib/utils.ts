@@ -29,28 +29,6 @@ export function loadEditorApi(): Promise<void> {
   return editorManager.loadAPI();
 }
 
-// 简化的文档状态管理
-interface DocumentState {
-  fileName: string;
-  file?: File;
-  url?: string | URL;
-}
-
-let documentState: DocumentState = {
-  fileName: '',
-  file: undefined,
-  url: undefined,
-};
-
-export const getDocmentObj = (): DocumentState => {
-  return { ...documentState };
-};
-
-export const setDocmentObj = (state: Partial<DocumentState>): void => {
-  documentState = { ...documentState, ...state };
-};
-
-
 // 生命周期
 
 // 统一的初始化函数 - 一次性加载所有必需的资源

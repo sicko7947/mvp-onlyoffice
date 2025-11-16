@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { handleDocumentOperation } from '@/onlyoffice-comp/lib/x2t';
-import { setDocmentObj, getDocmentObj, initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
+import { createEditorView } from '@/onlyoffice-comp/lib/x2t';
+import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
+import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/document-state';
 import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
 import { ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import Loading from '@/components/Loading';
@@ -15,7 +16,7 @@ export default function DocsPage() {
   const initializedRef = useRef(false);
   const [_, forceUpdate] = useState(0);
 
-  const handleOperation = async (fileName: string, file?: File) => {
+  const handleView = async (fileName: string, file?: File) => {
     setLoading(true);
     setError(null);
     try {
@@ -23,7 +24,7 @@ export default function DocsPage() {
       // 确保环境已初始化（如果已初始化会立即返回）
       await initializeOnlyOffice();
       const { fileName: currentFileName, file: currentFile } = getDocmentObj();
-      await handleDocumentOperation({
+      await createEditorView({
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
@@ -48,9 +49,9 @@ export default function DocsPage() {
         // 默认加载空 Word 文档
         if (!initializedRef.current && !editorManager.exists()) {
           initializedRef.current = true;
-          // await handleOperation('New_Document.docx');
+          // await handleView('New_Document.docx');
         }
-        await handleOperation('New_Document.docx');
+        await handleView('New_Document.docx');
       } catch (err) {
         console.error('Failed to initialize OnlyOffice:', err);
         setError('无法加载编辑器组件');
@@ -86,7 +87,7 @@ export default function DocsPage() {
               上传文档
             </button>
             <button
-              onClick={() => handleOperation('New_Document.docx')}
+              onClick={() => handleView('New_Document.docx')}
               className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               新建 Word
@@ -157,7 +158,7 @@ export default function DocsPage() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
-            handleOperation(file.name, file);
+            handleView(file.name, file);
             if (fileInputRef.current) fileInputRef.current.value = '';
           }
         }}
