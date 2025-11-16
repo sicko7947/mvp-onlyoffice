@@ -28,8 +28,8 @@ export default function ExcelPage() {
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
+        readOnly: readOnly,
       });
-      setReadOnly(editorManager.getReadOnly());
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       console.error('Document operation failed:', err);
@@ -68,7 +68,7 @@ export default function ExcelPage() {
 
     // 监听 loading 状态变化
     const handleLoadingChange = (data: { loading: boolean }) => {
-      // setLoading(data.loading);
+      setLoading(data.loading);
     };
     eventBus.on(EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
 
@@ -168,11 +168,12 @@ export default function ExcelPage() {
 
       {/* 编辑器容器 */}
       <div className="flex-1 relative">
-        <div id={ONLYOFFICE_ID} className="absolute inset-0" />
+        <div id={ONLYOFFICE_ID} className="absolute inset-0" style={{ display: loading ? 'none' : 'block' }}/>
       </div>
 
       {/* 加载遮罩 */}
       {loading && <Loading />}
+
 
       {/* 隐藏的文件输入 */}
       <input
