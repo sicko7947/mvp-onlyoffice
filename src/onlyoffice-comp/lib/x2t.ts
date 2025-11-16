@@ -831,6 +831,7 @@ export function createEditorInstance(config: {
       onSave: onSaveInEditor,
     },
   });
+  return editorManager
 }
 
 // 合并后的文件操作方法
@@ -838,9 +839,10 @@ export async function createEditorView(options: {
   isNew: boolean;
   fileName: string;
   file?: File;
+  readOnly?: boolean; 
 }): Promise<void> {
   try {
-    const { isNew, fileName, file } = options;
+    const { isNew, fileName, file, readOnly } = options;
     const fileType = getExtensions(file?.type || '')[0] || fileName.split('.').pop() || '';
 
     // 获取文档内容
@@ -863,12 +865,19 @@ export async function createEditorView(options: {
       documentData = await convertDocument(file);
     }
 
-    // 创建编辑器实例
-    createEditorInstance({
+    // 创建编辑器实例, 只执行一次 setReadOnly
+    const editor =  createEditorInstance({
       fileName,
       fileType,
       binData: documentData.bin,
       media: documentData.media,
+    });
+    let hasUsed = false
+    eventBus.on(EVENT_KEYS.DOCUMENT_READY, () => {
+      if(readOnly && !hasUsed){
+        editor.setReadOnly(readOnly);
+        hasUsed = true;
+      }
     });
   } catch (error: any) {
     console.error('文档操作失败：', error);

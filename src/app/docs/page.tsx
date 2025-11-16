@@ -28,10 +28,10 @@ export default function DocsPage() {
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
+        readOnly: readOnly,
       });
       // 同步只读状态
       console.log('editorManager.getReadOnly()-zptest', editorManager.getReadOnly());
-      setReadOnly(editorManager.getReadOnly());
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       console.error('Document operation failed:', err);
@@ -64,7 +64,7 @@ export default function DocsPage() {
 
     // 监听 loading 状态变化
     const handleLoadingChange = (data: { loading: boolean }) => {
-      // setLoading(data.loading);
+      setLoading(data.loading);
     };
     eventBus.on(EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
 

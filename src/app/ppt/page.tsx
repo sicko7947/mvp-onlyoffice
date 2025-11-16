@@ -14,8 +14,6 @@ export default function PptPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
-  const initializedRef = useRef(false);
-
   const [_, forceUpdate] = useState(0);
   const handleView = async (fileName: string, file?: File) => {
     setError(null);
@@ -28,8 +26,8 @@ export default function PptPage() {
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
+        readOnly: readOnly,
       });
-      setReadOnly(editorManager.getReadOnly());
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       console.error('Document operation failed:', err);
@@ -39,13 +37,9 @@ export default function PptPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        // 统一初始化所有资源
+        // step1: 初始化资源
         await initializeOnlyOffice();
-        // 默认加载空 PowerPoint 文档
-        if (!initializedRef.current && !editorManager.exists()) {
-          initializedRef.current = true;
-          // await handleView('New_Document.pptx');
-        }
+        // step2: 创建编辑器视图
         await handleView('New_Document.pptx');
       } catch (err) {
         console.error('Failed to initialize OnlyOffice:', err);
@@ -60,7 +54,7 @@ export default function PptPage() {
 
     // 监听 loading 状态变化
     const handleLoadingChange = (data: { loading: boolean }) => {
-      // setLoading(data.loading);
+      setLoading(data.loading);
     };
     eventBus.on(EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
 

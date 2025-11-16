@@ -313,7 +313,6 @@ export default function EditorPage() {
         fileName: currentFileName,
         isNew: !currentFile,
       });
-      setReadOnly(editorManager.getReadOnly());
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
     } finally {
