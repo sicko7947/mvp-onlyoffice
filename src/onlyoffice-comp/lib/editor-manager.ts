@@ -250,6 +250,19 @@ class EditorManager {
 
   // 导出文档（通过保存事件触发下载）
   async export(): Promise<any> {
+    // 如果处于只读模式，直接返回存储的 binData 数据
+    if (this.readOnly) {
+      if (!this.editorConfig) {
+        throw new Error('Editor config not available in read-only mode');
+      }
+      return {
+        binData: this.editorConfig.binData,
+        fileName: this.editorConfig.fileName,
+        fileType: this.editorConfig.fileType,
+      };
+    }
+    
+    // 非只读模式，使用编辑器的导出功能
     const editor = this.get();
     if (!editor) {
       throw new Error('Editor not available for export');
@@ -277,7 +290,9 @@ class EditorManager {
 
 // 导出单例实例
 export const editorManager = new EditorManager();
-(window as any).editorManager = editorManager;
+if (typeof window !== 'undefined') {
+  (window as any).editorManager = editorManager;
+}
 // 导出类型
 export type { DocEditor };
 
