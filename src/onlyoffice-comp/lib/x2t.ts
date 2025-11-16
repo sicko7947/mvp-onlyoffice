@@ -1,12 +1,14 @@
 import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
-import { getDocmentObj } from './utils';
+import { getDocmentObj } from './document-state';
 import { editorManager } from './editor-manager';
 import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID } from './const';
+import { saveEventBus, SaveDocumentData } from './eventbus';
 
 declare global {
   interface Window {
     Module: EmscriptenModule;
+    x2tConverter?: X2TConverter;
   }
 }
 
@@ -305,9 +307,9 @@ class X2TConverter {
   }
 
   /**
-   * 将 bin 格式转换为指定格式并下载
+   * 将 bin 格式转换为指定格式（仅转换，不下载）
    */
-  async convertBinToDocumentAndDownload(
+  async convertBinToDocument(
     bin: Uint8Array,
     originalFileName: string,
     targetExt = 'DOCX',
@@ -345,17 +347,36 @@ class X2TConverter {
       // 确保 result 是 Uint8Array 类型
       const resultArray = result instanceof Uint8Array ? result : new Uint8Array(result as ArrayBuffer);
 
-      // 下载文件
-      // TODO: 完善打印功能
-      this.saveWithFileSystemAPI(resultArray, outputFileName);
-
       return {
         fileName: outputFileName,
-        data: result,
+        data: resultArray,
       };
     } catch (error) {
       throw new Error(`Bin to document conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * 将 bin 格式转换为指定格式并下载
+   */
+  async convertBinToDocumentAndDownload(
+    bin: Uint8Array,
+    fileName: string,
+    targetExt = 'DOCX',
+  ): Promise<BinConversionResult> {
+    // 先执行转换
+    const result = await this.convertBinToDocument(bin, fileName, targetExt);
+
+    // 确保 data 是 Uint8Array 类型
+    const dataArray = result.data instanceof Uint8Array 
+      ? result.data 
+      : new Uint8Array(result.data as ArrayBuffer);
+
+    // 然后下载文件
+    // TODO: 完善打印功能
+    await this.saveWithFileSystemAPI(dataArray, result.fileName);
+
+    return result;
   }
 
   /**
@@ -494,9 +515,15 @@ class X2TConverter {
 
 // 单例实例
 const x2tConverter = new X2TConverter();
+window.x2tConverter = x2tConverter;
 export const loadScript = (): Promise<void> => x2tConverter.loadScript();
 export const initX2T = (): Promise<EmscriptenModule> => x2tConverter.initialize();
 export const convertDocument = (file: File): Promise<ConversionResult> => x2tConverter.convertDocument(file);
+export const convertBinToDocument = (
+  bin: Uint8Array,
+  fileName: string,
+  targetExt?: string,
+): Promise<BinConversionResult> => x2tConverter.convertBinToDocument(bin, fileName, targetExt);
 export const convertBinToDocumentAndDownload = (
   bin: Uint8Array,
   fileName: string,
@@ -593,18 +620,9 @@ interface SaveEvent {
   };
 }
 
-async function handleSaveDocument(event: SaveEvent) {
-  console.log('Save document event:', event);
-  console.log('Event data structure:', JSON.stringify(event, null, 2));
-  const rawDataType = typeof (event.data?.data as any)?.data;
-  console.log('Raw data type:', rawDataType);
-  const rawDataValue = (event.data?.data as any)?.data;
-  if (typeof rawDataValue === 'string') {
-    console.log('Raw data sample (first 200 chars):', rawDataValue.substring(0, 200));
-  } else {
-    console.log('Raw data sample:', rawDataValue);
-  }
 
+// 保存 文档数据到本地
+async function handleSaveDocument(event: SaveEvent): Promise<SaveDocumentData | null> {
   if (event.data && event.data.data) {
     const { data, option } = event.data;
     const { fileName } = getDocmentObj() || {};
@@ -656,19 +674,27 @@ async function handleSaveDocument(event: SaveEvent) {
       binData = new Uint8Array(0);
     }
     
-    // 创建下载
-    if (binData.length > 0) {
-      await convertBinToDocumentAndDownload(binData, fileName, c_oAscFileType2[option.outputformat]);
-    } else {
-      console.error('Empty document data in save event');
-    }
+    // // 创建下载
+    // if (binData.length > 0) {
+    //   await convertBinToDocumentAndDownload(binData, fileName, c_oAscFileType2[option.outputformat]);
+    // } else {
+    //   console.error('Empty document data in save event');
+    // }
+
+
+    const result = {
+      fileName: fileName,
+      fileType: c_oAscFileType2[option.outputformat],
+      binData: binData,
+    };
+
+    // 通过 eventbus 通知
+    saveEventBus.emit(result);
+
+    return result;
   }
 
-  // 告知编辑器保存完成
-  editorManager.get()?.sendCommand({
-    command: 'asc_onSaveCallback',
-    data: { err_code: 0 },
-  });
+  return null;
 }
 
 // 获取文档类型
@@ -777,19 +803,9 @@ export function createEditorInstance(config: {
       },
 
       // core: 下载
-      onSave: handleSaveDocument,
-      onDownloadAs: (event: any) => {
-        console.log('DownloadAs event:', event);
-        // 如果提供了下载 URL，直接下载
-        if (event.data && event.data.url) {
-          const link = document.createElement('a');
-          link.href = event.data.url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      }
+      onSave: async (event: any) => {
+        await handleSaveDocument(event);
+      },
     },
   });
 
@@ -807,7 +823,7 @@ export function createEditorInstance(config: {
 }
 
 // 合并后的文件操作方法
-export async function handleDocumentOperation(options: {
+export async function createEditorView(options: {
   isNew: boolean;
   fileName: string;
   file?: File;

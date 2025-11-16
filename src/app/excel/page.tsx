@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { handleDocumentOperation } from '@/onlyoffice-comp/lib/x2t';
+import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
+
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
-import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/utils';
+import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/document-state';
 import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
 import { ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import Loading from '@/components/Loading';
@@ -15,7 +16,7 @@ export default function ExcelPage() {
   const [readOnly, setReadOnly] = useState(false);
   const initializedRef = useRef(false);
   const [_, forceUpdate] = useState(0);
-  const handleOperation = async (fileName: string, file?: File) => {
+  const handleView = async (fileName: string, file?: File) => {
     setLoading(true);
     setError(null);
     try {
@@ -23,7 +24,7 @@ export default function ExcelPage() {
       // 确保环境已初始化（如果已初始化会立即返回）
       await initializeOnlyOffice();
       const { fileName: currentFileName, file: currentFile } = getDocmentObj();
-      await handleDocumentOperation({
+      await createEditorView({
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
@@ -47,6 +48,8 @@ export default function ExcelPage() {
         // 默认加载 test.xlsx 文档
         if (!initializedRef.current && !editorManager.exists()) {
           initializedRef.current = true;
+        }
+
           // 加载 public/test.xlsx 文件
           const response = await fetch('/test.xlsx');
           if (!response.ok) {
@@ -54,8 +57,7 @@ export default function ExcelPage() {
           }
           const blob = await response.blob();
           const file = new File([blob], 'test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          await handleOperation('test.xlsx', file);
-        }
+          await handleView('test.xlsx', file);
       } catch (err) {
         console.error('Failed to initialize OnlyOffice:', err);
         setError('无法加载编辑器组件');
@@ -90,7 +92,7 @@ export default function ExcelPage() {
               上传文档
             </button>
             <button
-              onClick={() => handleOperation('New_Document.xlsx')}
+              onClick={() => handleView('New_Document.xlsx')}
               className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               新建 Excel
@@ -98,7 +100,28 @@ export default function ExcelPage() {
             {editorManager.exists() && (
               <>
                 <button
-                  onClick={() => editorManager.export()}
+                  onClick={async () => {
+                    try {
+                      const binData = await editorManager.export();
+                      
+                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,'XLSX');
+                      console.log(buffer);
+                      // 下载文件
+                      const blob = new Blob([buffer.data], {
+                        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                      });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = binData.fileName;
+                      link.style.display = 'none';
+                      document.body.appendChild(link);
+                      link.click();
+                      // downloadFile(buffer.data, binData.fileName,'xlsx');
+                    } catch (err) {
+                      console.error('导出失败:', err);
+                    } 
+                  }}
                   className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                 >
                   💾 导出
@@ -161,7 +184,7 @@ export default function ExcelPage() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
-            handleOperation(file.name, file);
+            handleView(file.name, file);
             if (fileInputRef.current) fileInputRef.current.value = '';
           }
         }}
