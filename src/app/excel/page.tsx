@@ -6,8 +6,9 @@ import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
 import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/document-state';
 import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
-import { ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
+import { EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import Loading from '@/components/Loading';
+import { eventBus } from '@/onlyoffice-comp/lib/eventbus';
 
 export default function ExcelPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,8 +41,6 @@ export default function ExcelPage() {
 
   useEffect(() => {
     const init = async () => {
-      
-      forceUpdate((prev) => prev + 1);
       try {
         // 统一初始化所有资源
         await initializeOnlyOffice();
@@ -66,6 +65,9 @@ export default function ExcelPage() {
 
     init();
 
+    eventBus.on(EVENT_KEYS.DOCUMENT_READY, (data) => {
+      forceUpdate((prev) => prev + 1);
+    });
     return () => {
       editorManager.destroy();
     };
@@ -104,7 +106,7 @@ export default function ExcelPage() {
                     try {
                       const binData = await editorManager.export();
                       
-                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,'XLSX');
+                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.XLSX);
                       console.log(buffer);
                       // 下载文件
                       const blob = new Blob([buffer.data], {
@@ -148,12 +150,7 @@ export default function ExcelPage() {
                 >
                   {readOnly ? '🔒 只读模式' : '✏️ 编辑模式'}
                 </button>
-                <button
-                  onClick={() => editorManager.print()}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  🖨️ 打印
-                </button>
+                
               </>
             )}
           </div>

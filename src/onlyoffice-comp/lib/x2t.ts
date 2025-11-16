@@ -733,7 +733,11 @@ export function createEditorInstance(config: {
     // 如果容器不存在，创建一个新的
     container = document.createElement('div');
     container.id = containerId;
-    container.className = 'absolute inset-0';
+    container.style.position = 'absolute';
+    container.style.top = '0';
+    container.style.right = '0';
+    container.style.bottom = '0';
+    container.style.left = '0';
     // 尝试找到父容器（使用 editorManager 的配置）
     const parentSelector = editorManager.getContainerParentSelector();
     const parent = document.querySelector(parentSelector) || document.body;
@@ -785,13 +789,12 @@ export function createEditorInstance(config: {
       onAppReady: () => {
         // 直接使用 editor 实例，因为此时编辑器还未注册到管理器
         // 设置媒体资源
-        // if (media) {
-        //   editor.sendCommand({
-        //     command: 'asc_setImageUrls',
-        //     data: { urls: media },
-        //   });
-        // }
-
+        if (media) {
+          editor.sendCommand({
+            command: 'asc_setImageUrls',
+            data: { urls: media },
+          });
+        }
         // 加载文档内容
         editor.sendCommand({
           command: 'asc_openDocument',

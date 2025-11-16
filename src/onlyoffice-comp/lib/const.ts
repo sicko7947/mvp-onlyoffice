@@ -9,3 +9,9 @@ export const EVENT_KEYS = {
     SAVE_DOCUMENT: 'saveDocument',
     DOCUMENT_READY: 'documentReady',
 } as const;
+
+export const FILE_TYPE = {
+    DOCX: 'DOCX',
+    XLSX: 'XLSX',
+    PPTX: 'PPTX',
+} as const;
