@@ -3,3 +3,9 @@ export const ONLUOFFICE_RESOURCE = {
     DOCUMENTS: '/web-apps/apps/api/documents/api.js',
     X2T: '/wasm/x2t/x2t.js',
 }
+
+// EventBus 事件名称
+export const EVENT_KEYS = {
+    SAVE_DOCUMENT: 'saveDocument',
+    DOCUMENT_READY: 'documentReady',
+} as const;

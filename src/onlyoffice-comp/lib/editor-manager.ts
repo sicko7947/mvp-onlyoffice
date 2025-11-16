@@ -6,8 +6,8 @@ interface DocEditor {
   }) => void;
   destroyEditor: () => void;
 }
-import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID } from './const';
-import { saveEventBus, SaveDocumentData } from './eventbus';
+import { ONLUOFFICE_RESOURCE, ONLYOFFICE_ID, EVENT_KEYS } from './const';
+import { eventBus } from './eventbus';
 // DocsAPI 类型定义
 declare global {
   interface Window {
@@ -193,35 +193,29 @@ class EditorManager {
     //   return;
     // }
     
-    // // 如果从可编辑切换到只读，使用命令切换
-    // const editor = this.get();
-    // if (!editor) {
-    //   console.warn('Editor not available, cannot set read-only mode');
-    //   return;
-    // }
+    // 如果从可编辑切换到只读，使用命令切换
+    const editor = this.get();
+    if (!editor) {
+      console.warn('Editor not available, cannot set read-only mode');
+      return;
+    }
     
-    // try {
-    //   const message = '文档已设置为只读模式';
-    //   const rawEditor = this.editor as any;
+    try {
+      const message = '文档已设置为只读模式';
+      // rawEditor.processRightsChange(false, message);
+      editor.sendCommand({
+        command: 'processRightsChange',
+        data: {
+          enabled: false,
+          message: message
+        },
+      });
       
-    //   // 只读模式：使用 processRightsChange 命令
-    //   if (rawEditor && typeof rawEditor.processRightsChange === 'function') {
-    //     rawEditor.processRightsChange(false, message);
-    //   } else {
-    //     editor.sendCommand({
-    //       command: 'processRightsChange',
-    //       data: {
-    //         enabled: false,
-    //         message: message,
-    //       },
-    //     });
-    //   }
-      
-    //   this.readOnly = true;
-    // } catch (error) {
-    //   console.error('Failed to set read-only mode:', error);
-    //   throw error;
-    // }
+      this.readOnly = true;
+    } catch (error) {
+      console.error('Failed to set read-only mode:', error);
+      throw error;
+    }
   }
 
   // 获取当前只读状态
@@ -237,7 +231,7 @@ class EditorManager {
   }
 
   // 导出文档（通过保存事件触发下载）
-  async export(): Promise<SaveDocumentData> {
+  async export(): Promise<any> {
     const editor = this.get();
     if (!editor) {
       throw new Error('Editor not available for export');
@@ -245,34 +239,17 @@ class EditorManager {
 
     console.log('Triggering export via asc_save command');
     
-    // 返回 Promise，等待 saveEventBus 通知
-    return new Promise<SaveDocumentData>((resolve, reject) => {
-      // 设置超时，避免无限等待
-      const timeout = setTimeout(() => {
-        saveEventBus.off(handleSave);
-        reject(new Error('Export timeout: no data received'));
-      }, 3000); // 3秒超时
-
-      // 监听保存事件
-      const handleSave = (data: SaveDocumentData) => {
-        clearTimeout(timeout);
-        saveEventBus.off(handleSave);
-        resolve(data);
-      };
-
-      saveEventBus.on(handleSave);
-
-      // 触发保存
-      try {
-        console.log('Trying downloadAs method');
-        (editor as any).downloadAs();
-      } catch (error) {
-        clearTimeout(timeout);
-        saveEventBus.off(handleSave);
-        console.error('Failed to send asc_save command:', error);
-        reject(error);
-      }
-    });
+    // 触发保存
+    try {
+      console.log('Trying downloadAs method');
+      (editor as any).downloadAs();
+      
+      // 等待保存事件，使用 eventBus.waitFor
+      return await eventBus.waitFor(EVENT_KEYS.SAVE_DOCUMENT, 3000); // 3秒超时
+    } catch (error) {
+      console.error('Failed to send asc_save command:', error);
+      throw error;
+    }
   }
 }
 
