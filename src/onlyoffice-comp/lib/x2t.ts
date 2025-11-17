@@ -77,6 +77,7 @@ class X2TConverter {
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
+      script.id = 'onlyoffice-script-x2t';
       script.src = this.SCRIPT_PATH;
       script.onload = () => {
         this.hasScriptLoaded = true;
