@@ -42,3 +42,56 @@ export { getDocumentState, setDocumentState, DocumentStateProxy };
 // 导出类型
 export type { DocumentState };
 
+/**
+ * 获取当前语言代码（'zh' 或 'en'）
+ * 优先级：URL 参数 locale -> localStorage -> 浏览器语言 -> 默认 'en'
+ */
+export function getCurrentLang(): 'zh' | 'en' {
+  if (typeof window === 'undefined') return 'en';
+  
+  // 1. 从 URL 参数获取
+  const params = new URLSearchParams(window.location.search);
+  const urlLang = params.get('locale');
+  if (urlLang === 'zh' || urlLang === 'zh-CN') {
+    return 'zh';
+  }
+  if (urlLang === 'en') {
+    return 'en';
+  }
+  
+  // 2. 从 localStorage 获取
+  const savedLang = localStorage.getItem('document-lang');
+  if (savedLang === 'zh' || savedLang === 'zh-CN') {
+    return 'zh';
+  }
+  if (savedLang === 'en') {
+    return 'en';
+  }
+  
+  // 3. 从浏览器语言获取
+  const browserLang = navigator.language.toLowerCase();
+  if (browserLang.startsWith('zh')) {
+    return 'zh';
+  }
+  
+  // 4. 默认英文
+  return 'en';
+}
+
+/**
+ * 设置语言并保存到 localStorage
+ */
+export function setCurrentLang(lang: 'zh' | 'en'): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('document-lang', lang);
+  }
+}
+
+/**
+ * 获取 OnlyOffice 语言代码（BCP 47 标准）
+ * 优先级：URL 参数 locale -> localStorage -> 浏览器语言 -> 默认 'en'
+ */
+export function getOnlyOfficeLang(): string {
+  const lang = getCurrentLang();
+  return lang === 'zh' ? 'zh-CN' : 'en';
+}
