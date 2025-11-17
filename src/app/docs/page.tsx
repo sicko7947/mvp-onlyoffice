@@ -6,7 +6,7 @@ import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
 import { setDocmentObj, getDocmentObj, getOnlyOfficeLang, getCurrentLang, setCurrentLang } from '@/onlyoffice-comp/lib/document-state';
 import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
-import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
+import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID, ONLYOFFICE_LANG_KEY } from '@/onlyoffice-comp/lib/const';
 import Loading from '@/components/Loading';
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 
@@ -20,7 +20,7 @@ function DocsPageContent() {
   const [readOnly, setReadOnly] = useState(false);
   const initializedRef = useRef(false);
   const [_, forceUpdate] = useState(0);
-  const [currentLang, setCurrentLangState] = useState<'zh' | 'en'>('en');
+  const [currentLang, setCurrentLangState] = useState<'zh' | 'en'>(ONLYOFFICE_LANG_KEY.EN);
 
   // 监听 URL 参数变化，更新语言状态
   useEffect(() => {
@@ -30,7 +30,7 @@ function DocsPageContent() {
 
   // 切换语言
   const handleLanguageSwitch = async () => {
-    const newLang = currentLang === 'zh' ? 'en' : 'zh';
+    const newLang = currentLang === ONLYOFFICE_LANG_KEY.ZH ? ONLYOFFICE_LANG_KEY.EN : ONLYOFFICE_LANG_KEY.ZH;
     setCurrentLang(newLang);
     setCurrentLangState(newLang);
     // 保留现有的 URL 参数，只更新 locale
@@ -129,9 +129,9 @@ function DocsPageContent() {
             <button
               onClick={handleLanguageSwitch}
               className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
-              title={currentLang === 'zh' ? 'Switch to English' : '切换到中文'}
+              title={currentLang === ONLYOFFICE_LANG_KEY.ZH ? 'Switch to English' : '切换到中文'}
             >
-              {currentLang === 'zh' ? '点击切换EN' : '点击切换中文'}
+              {currentLang === ONLYOFFICE_LANG_KEY.ZH ? '点击切换EN' : '点击切换中文'}
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}

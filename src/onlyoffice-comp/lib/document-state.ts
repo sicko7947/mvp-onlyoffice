@@ -1,3 +1,5 @@
+import { ONLYOFFICE_LANG_KEY } from './const';
+
 /**
  * 文档状态管理
  * 使用 Proxy 模式管理文档状态
@@ -47,35 +49,27 @@ export type { DocumentState };
  * 优先级：URL 参数 locale -> localStorage -> 浏览器语言 -> 默认 'en'
  */
 export function getCurrentLang(): 'zh' | 'en' {
-  if (typeof window === 'undefined') return 'en';
+  if (typeof window === 'undefined') return ONLYOFFICE_LANG_KEY.EN;
   
   // 1. 从 URL 参数获取
   const params = new URLSearchParams(window.location.search);
   const urlLang = params.get('locale');
-  if (urlLang === 'zh' || urlLang === 'zh-CN') {
-    return 'zh';
+  if (urlLang === ONLYOFFICE_LANG_KEY.ZH || urlLang === 'zh-CN') {
+    return ONLYOFFICE_LANG_KEY.ZH;
   }
-  if (urlLang === 'en') {
-    return 'en';
+  if (urlLang === ONLYOFFICE_LANG_KEY.EN) {
+    return ONLYOFFICE_LANG_KEY.EN;
   }
   
-  // 2. 从 localStorage 获取
-  const savedLang = localStorage.getItem('document-lang');
-  if (savedLang === 'zh' || savedLang === 'zh-CN') {
-    return 'zh';
-  }
-  if (savedLang === 'en') {
-    return 'en';
-  }
   
   // 3. 从浏览器语言获取
   const browserLang = navigator.language.toLowerCase();
-  if (browserLang.startsWith('zh')) {
-    return 'zh';
+  if (browserLang.startsWith(ONLYOFFICE_LANG_KEY.ZH)) {
+    return ONLYOFFICE_LANG_KEY.ZH;
   }
   
   // 4. 默认英文
-  return 'en';
+  return ONLYOFFICE_LANG_KEY.ZH;
 }
 
 /**
@@ -93,5 +87,5 @@ export function setCurrentLang(lang: 'zh' | 'en'): void {
  */
 export function getOnlyOfficeLang(): string {
   const lang = getCurrentLang();
-  return lang === 'zh' ? 'zh-CN' : 'en';
+  return lang === ONLYOFFICE_LANG_KEY.ZH ? 'zh-CN' : ONLYOFFICE_LANG_KEY.EN;
 }

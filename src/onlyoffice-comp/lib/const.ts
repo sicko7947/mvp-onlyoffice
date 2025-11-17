@@ -48,3 +48,9 @@ export const READONLY_TIMEOUT_CONFIG = {
 
 // 向后兼容：保留旧的导出名称
 export const READONLY_SWITCH_MIN_DELAY = READONLY_TIMEOUT_CONFIG.READONLY_SWITCH_MIN_DELAY;
+
+// 语言 key 常量
+export const ONLYOFFICE_LANG_KEY = {
+  ZH: 'zh',
+  EN: 'en',
+} as const;

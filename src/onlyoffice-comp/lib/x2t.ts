@@ -2,7 +2,7 @@ import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
 import { editorManager } from './editor-manager';
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG } from './const';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY } from './const';
 import { onlyofficeEventbus } from './eventbus';
 
 declare global {
@@ -722,7 +722,7 @@ export function createEditorInstance(config: {
   readOnly?: boolean; // 是否只读模式，默认为 false
   lang?: string; // 语言代码，默认为 'en'
 }) {
-  const { fileName, fileType, binData, media, readOnly = false, lang = 'en' } = config;
+  const { fileName, fileType, binData, media, readOnly = false, lang = ONLYOFFICE_LANG_KEY.EN } = config;
 
   // 确保 API 已加载
   if (!window.DocsAPI) {
@@ -840,7 +840,7 @@ export async function createEditorView(options: {
   lang?: string; // 语言代码，默认为 'en'
 }): Promise<void> {
   try {
-    const { isNew, fileName, file, readOnly, lang = 'en' } = options;
+    const { isNew, fileName, file, readOnly, lang = ONLYOFFICE_LANG_KEY.EN } = options;
     const fileType = getExtensions(file?.type || '')[0] || fileName.split('.').pop() || '';
 
     // 获取文档内容
