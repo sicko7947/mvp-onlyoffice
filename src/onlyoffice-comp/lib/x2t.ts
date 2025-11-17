@@ -720,8 +720,9 @@ export function createEditorInstance(config: {
   binData: ArrayBuffer | string;
   media?: any;
   readOnly?: boolean; // 是否只读模式，默认为 false
+  lang?: string; // 语言代码，默认为 'en'
 }) {
-  const { fileName, fileType, binData, media, readOnly = false } = config;
+  const { fileName, fileType, binData, media, readOnly = false, lang = 'en' } = config;
 
   // 确保 API 已加载
   if (!window.DocsAPI) {
@@ -759,7 +760,7 @@ export function createEditorInstance(config: {
     },
     editorConfig: {
       // mode: readOnly ? 'view' : 'edit', // 根据 readOnly 参数设置模式
-      // lang: 'zh',
+      lang: lang,
       customization: {
         help: false,
         about: false,
@@ -835,10 +836,11 @@ export async function createEditorView(options: {
   isNew: boolean;
   fileName: string;
   file?: File;
-  readOnly?: boolean; 
+  readOnly?: boolean;
+  lang?: string; // 语言代码，默认为 'en'
 }): Promise<void> {
   try {
-    const { isNew, fileName, file, readOnly } = options;
+    const { isNew, fileName, file, readOnly, lang = 'en' } = options;
     const fileType = getExtensions(file?.type || '')[0] || fileName.split('.').pop() || '';
 
     // 获取文档内容
@@ -867,6 +869,7 @@ export async function createEditorView(options: {
       fileType,
       binData: documentData.bin,
       media: documentData.media,
+      lang,
     });
     let hasUsed = false
     onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, () => {

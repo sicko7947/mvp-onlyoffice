@@ -1,20 +1,56 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
-import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/document-state';
+import { setDocmentObj, getDocmentObj, getOnlyOfficeLang, getCurrentLang, setCurrentLang } from '@/onlyoffice-comp/lib/document-state';
 import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
 import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import Loading from '@/components/Loading';
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 
 export default function PptPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [_, forceUpdate] = useState(0);
+  const [currentLang, setCurrentLangState] = useState<'zh' | 'en'>('en');
+
+  // 监听 URL 参数变化，更新语言状态
+  useEffect(() => {
+    const lang = getCurrentLang();
+    setCurrentLangState(lang);
+  }, [searchParams]);
+
+  // 切换语言
+  const handleLanguageSwitch = async () => {
+    const newLang = currentLang === 'zh' ? 'en' : 'zh';
+    setCurrentLang(newLang);
+    setCurrentLangState(newLang);
+    // 保留现有的 URL 参数，只更新 locale
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.set('locale', newLang);
+    router.push(`${pathname}?${params.toString()}`);
+    
+    // 如果编辑器已存在，重新创建以应用新语言
+    if (editorManager.exists()) {
+      const { fileName, file } = getDocmentObj();
+      if (fileName) {
+        try {
+          await handleView(fileName, file);
+          forceUpdate((prev) => prev + 1);
+        } catch (err) {
+          console.error('Failed to reload editor with new language:', err);
+        }
+      }
+    }
+  };
+
   const handleView = async (fileName: string, file?: File) => {
     setError(null);
     try {
@@ -27,6 +63,7 @@ export default function PptPage() {
         fileName: currentFileName,
         isNew: !currentFile,
         readOnly: readOnly,
+        lang: getOnlyOfficeLang(),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
@@ -78,6 +115,13 @@ export default function PptPage() {
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={handleLanguageSwitch}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+              title={currentLang === 'zh' ? 'Switch to English' : '切换到中文'}
+            >
+              {currentLang === 'zh' ? '点击切换EN' : '点击切换中文'}
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
