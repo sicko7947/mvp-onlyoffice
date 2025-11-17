@@ -142,6 +142,7 @@ class EditorManager {
 
     this.apiLoadingPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
+      script.id = 'onlyoffice-script-api';
       script.src = ONLUOFFICE_RESOURCE.DOCUMENTS;
       script.onload = () => {
         this.apiLoaded = true;
