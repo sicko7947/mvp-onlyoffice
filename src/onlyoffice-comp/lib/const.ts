@@ -57,3 +57,14 @@ export const ONLYOFFICE_LANG_KEY = {
   ZH: 'zh',
   EN: 'en',
 } as const;
+
+
+export const ONLYOFFICE_CACHE_FILE = [
+    "wasm/x2t/x2t.js ",
+    "wasm/x2t/x2t.wasm",
+    "sdkjs/common/zlib/engine/zlib.wasm",
+    "sdkjs/common/libfont/engine/fonts.wasm"
+
+]
+
+export const ONLYOFFICE_INDEXEDDB_NAME = 'onlyoffice-cache';

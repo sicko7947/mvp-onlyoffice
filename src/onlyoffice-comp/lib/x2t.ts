@@ -2,7 +2,7 @@ import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
 import { editorManager } from './editor-manager';
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY } from './const';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME } from './const';
 import { onlyofficeEventbus } from './eventbus';
 
 declare global {
@@ -67,12 +67,166 @@ class X2TConverter {
 
   private readonly WORKING_DIRS = ['/working', '/working/media', '/working/fonts', '/working/themes'];
   private readonly SCRIPT_PATH = ONLYOFFICE_RESOURCE.X2T;
+  private dbName = ONLYOFFICE_INDEXEDDB_NAME;
+  private dbVersion = 1;
+  private db: IDBDatabase | null = null;
+
+  /**
+   * 初始化 IndexedDB 
+   */
+  private async initDB(): Promise<IDBDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion);
+
+      request.onerror = () => {
+        reject(new Error('Failed to open IndexedDB'));
+      };
+
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve(this.db);
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('wasm-cache')) {
+          db.createObjectStore('wasm-cache', { keyPath: 'url' });
+        }
+      };
+    });
+  }
+
+  /**
+   * 从 IndexedDB 获取缓存的 WASM 文件
+   */
+  private async getCachedWasm(url: string): Promise<ArrayBuffer | null> {
+    try {
+      const db = await this.initDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['wasm-cache'], 'readonly');
+        const store = transaction.objectStore('wasm-cache');
+        const request = store.get(url);
+
+        request.onsuccess = () => {
+          const result = request.result;
+          if (result && result.data) {
+            resolve(result.data);
+          } else {
+            resolve(null);
+          }
+        };
+
+        request.onerror = () => {
+          resolve(null);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to get cached WASM:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 将 WASM 文件缓存到 IndexedDB
+   */
+  private async cacheWasm(url: string, data: ArrayBuffer): Promise<void> {
+    try {
+      const db = await this.initDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['wasm-cache'], 'readwrite');
+        const store = transaction.objectStore('wasm-cache');
+        const request = store.put({ url, data, timestamp: Date.now() });
+
+        request.onsuccess = () => {
+          resolve();
+        };
+
+        request.onerror = () => {
+          reject(new Error('Failed to cache WASM'));
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to cache WASM:', error);
+    }
+  }
+
+  /**
+   * 拦截 fetch，缓存 WASM 文件到 IndexedDB
+   */
+  private interceptFetch(): void {
+    if (typeof window === 'undefined' || !window.fetch || (window.fetch as any).__wasmIntercepted) {
+      return;
+    }
+
+    const originalFetch = window.fetch;
+
+    window.fetch = async function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      let url: string;
+      
+      if (typeof input === 'string') {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else if (input instanceof Request) {
+        url = input.url;
+      } else {
+        return originalFetch(input, init);
+      }
+
+      // 拦截所有 
+      if (ONLYOFFICE_CACHE_FILE.some(file => url.includes(file))) {
+        // 先尝试从缓存读取
+        const cached = await (this as any).getCachedWasm(url);
+        if (cached) {
+          console.log('onlyoffice: Loading WASM from IndexedDB cache:', url);
+          return new Response(cached, {
+            headers: {
+              'Content-Type': 'application/wasm',
+            },
+          });
+        }
+        // 缓存未命中，从网络加载
+        console.log('onlyoffice: Loading WASM from network:', url);
+        const response = await originalFetch(input, init);
+        
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          
+          // 缓存到 IndexedDB（异步，不阻塞响应）
+          (this as any).cacheWasm(url, arrayBuffer).catch((err: any) => {
+            console.warn('Failed to cache WASM:', err);
+          });
+          
+          return new Response(arrayBuffer, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+              'Content-Type': 'application/wasm',
+            },
+          });
+        }
+        
+        return response;
+      }
+
+      return originalFetch(input, init);
+    }.bind(this) as typeof fetch;
+
+    (window.fetch as any).__wasmIntercepted = true;
+  }
 
   /**
    * 加载 X2T 脚本文件
    */
   async loadScript(): Promise<void> {
     if (this.hasScriptLoaded) return;
+
+    // 拦截 fetch，缓存 WASM 文件到 IndexedDB
+    this.interceptFetch();
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -612,6 +766,42 @@ export const c_oAscFileType2 = Object.fromEntries(
   Object.entries(oAscFileType).map(([key, value]) => [value, key]),
 ) as Record<number, keyof typeof oAscFileType>;
 
+
+
+
+const getMimeTypeFromExtension = (extension: string): string => {
+  const mimeMap: Record<string, string> = {
+    // 文档类型
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword',
+    odt: 'application/vnd.oasis.opendocument.text',
+    rtf: 'application/rtf',
+    txt: 'text/plain',
+    pdf: 'application/pdf',
+
+    // 表格类型
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    xls: 'application/vnd.ms-excel',
+    ods: 'application/vnd.oasis.opendocument.spreadsheet',
+    csv: 'text/csv',
+
+    // 演示文稿类型
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ppt: 'application/vnd.ms-powerpoint',
+    odp: 'application/vnd.oasis.opendocument.presentation',
+
+    // 图片类型
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    bmp: 'image/bmp',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+  };
+
+  return mimeMap[extension.toLowerCase()] || 'application/octet-stream';
+}
 interface SaveEvent {
   data: {
     data: {
@@ -713,6 +903,85 @@ export function getDocumentType(fileType: string): string | null {
   return null;
 }
 
+
+// 全局 media 映射对象
+const media: Record<string, string> = {};
+/**
+ * 处理文件写入请求（主要用于处理粘贴的图片）
+ * @param event - OnlyOffice 编辑器的文件写入事件
+ */
+function handleWriteFile(event: any) {
+  try {
+    console.log('Write file event:', event);
+
+    const { data: eventData } = event;
+    if (!eventData) {
+      console.warn('No data provided in writeFile event');
+      return;
+    }
+
+    const {
+      data: imageData, // Uint8Array 图片数据
+      file: fileName, // 文件名，如 "display8image-174799443357-0.png"
+      _target, // 目标对象，包含 frameOrigin 等信息
+    } = eventData;
+
+    // 验证数据
+    if (!imageData || !(imageData instanceof Uint8Array)) {
+      throw new Error('Invalid image data: expected Uint8Array');
+    }
+
+    if (!fileName || typeof fileName !== 'string') {
+      throw new Error('Invalid file name');
+    }
+
+    // 从文件名中提取扩展名
+    const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'png';
+    const mimeType = getMimeTypeFromExtension(fileExtension);
+
+    // 创建 Blob 对象
+    const blob = new Blob([imageData as unknown as BlobPart], { type: mimeType });
+
+    // 创建对象 URL
+    const objectUrl = window.URL.createObjectURL(blob);
+    // 将图片 URL 添加到媒体映射中，使用原始文件名作为 key
+    media[`media/${fileName}`] = objectUrl;
+    editorManager.get()?.sendCommand({
+      command: 'asc_setImageUrls',
+      data: {
+        urls: media,
+      },
+    });
+
+    editorManager.get()?.sendCommand({
+      command: 'asc_writeFileCallback',
+      data: {
+        // 图片 base64
+        path: objectUrl,
+        imgName: fileName,
+      },
+    });
+    console.log(`Successfully processed image: ${fileName}, URL: ${media}`);
+  } catch (error) {
+    console.error('Error handling writeFile:', error);
+
+    // 通知编辑器文件处理失败
+    editorManager.get()?.sendCommand({
+      command: 'asc_writeFileCallback',
+      data: {
+        success: false,
+        error: error.message,
+      },
+    });
+
+    if (event.callback && typeof event.callback === 'function') {
+      event.callback({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+}
 // 公共编辑器创建方法
 export function createEditorInstance(config: {
   fileName: string;
@@ -793,6 +1062,7 @@ export function createEditorInstance(config: {
       },
     },
     events: {
+      writeFile: handleWriteFile,
       onAppReady: () => {
         // 直接使用 editor 实例，因为此时编辑器还未注册到管理器
         // 设置媒体资源
