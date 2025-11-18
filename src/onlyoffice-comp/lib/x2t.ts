@@ -2,7 +2,7 @@ import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
 import { editorManager } from './editor-manager';
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME } from './const';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME, type CacheFileConfig } from './const';
 import { onlyofficeEventbus } from './eventbus';
 
 declare global {
@@ -155,7 +155,26 @@ class X2TConverter {
   }
 
   /**
+   * 检查 URL 是否匹配缓存配置
+   */
+  private matchCacheConfig(url: string): CacheFileConfig | null {
+    for (const config of ONLYOFFICE_CACHE_FILE) {
+      if (typeof config.url === 'string') {
+        if (url.includes(config.url)) {
+          return config;
+        }
+      } else if (config.url instanceof RegExp) {
+        if (config.url.test(url)) {
+          return config;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * 拦截 fetch，缓存 WASM 文件到 IndexedDB
+   * 使用配置化的方式处理不同的 WASM 文件
    */
   private interceptFetch(): void {
     if (typeof window === 'undefined' || !window.fetch || (window.fetch as any).__wasmIntercepted) {
@@ -166,38 +185,69 @@ class X2TConverter {
 
     window.fetch = async function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       let url: string;
+      let originalUrl: string;
       
       if (typeof input === 'string') {
         url = input;
+        originalUrl = input;
       } else if (input instanceof URL) {
         url = input.href;
+        originalUrl = input.href;
       } else if (input instanceof Request) {
         url = input.url;
+        originalUrl = input.url;
       } else {
         return originalFetch(input, init);
       }
 
-      // 拦截所有 
-      if (ONLYOFFICE_CACHE_FILE.some(file => url.includes(file))) {
-        // 先尝试从缓存读取
-        const cached = await (this as any).getCachedWasm(url);
+      // 检查是否匹配缓存配置
+      const config = (this as any).matchCacheConfig(url);
+      if (config) {
+        // 先尝试从缓存读取（使用原始 URL 作为 key）
+        const cached = await (this as any).getCachedWasm(originalUrl);
         if (cached) {
-          console.log('onlyoffice: Loading WASM from IndexedDB cache:', url);
+          console.warn('onlyoffice: Loading WASM from IndexedDB cache:', originalUrl);
           return new Response(cached, {
             headers: {
               'Content-Type': 'application/wasm',
             },
           });
         }
-        // 缓存未命中，从网络加载
-        console.log('onlyoffice: Loading WASM from network:', url);
-        const response = await originalFetch(input, init);
-        
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
           
-          // 缓存到 IndexedDB（异步，不阻塞响应）
-          (this as any).cacheWasm(url, arrayBuffer).catch((err: any) => {
+        // 使用配置的 event 函数处理 URL
+        const { fetchUrl, isCompressed, compressionType } = config.event(url);
+        if (isCompressed && compressionType) {
+          console.warn('onlyoffice: Redirecting to compressed version:', fetchUrl);
+        }
+
+        // 缓存未命中，从网络加载
+        const response = await originalFetch(fetchUrl, init);
+        
+
+        if (response.ok) {
+          let arrayBuffer: ArrayBuffer;
+          
+
+          // 检查响应头是否已经设置了 Content-Encoding
+          // 如果服务器设置了 Content-Encoding，浏览器会自动解压，我们直接使用即可
+          const contentEncoding = response.headers.get('Content-Encoding');
+          const isAutoDecompressed = contentEncoding === 'gzip' || contentEncoding === 'br';
+          if (isCompressed && compressionType && !isAutoDecompressed) {
+            // 解压缩文件
+            const decompressionStream = new DecompressionStream(compressionType);
+            const stream = response.body?.pipeThrough(decompressionStream);
+            if (!stream) {
+              throw new Error('Failed to create decompression stream');
+            }
+            const decompressedResponse = new Response(stream);
+            arrayBuffer = await decompressedResponse.arrayBuffer();
+            console.warn(`onlyoffice: Decompressed WASM file (${compressionType})`);
+          } else {
+            arrayBuffer = await response.arrayBuffer();
+          }
+          
+          // 缓存到 IndexedDB（使用原始 URL 作为 key，存储解压后的数据）
+          (this as any).cacheWasm(originalUrl, arrayBuffer).catch((err: any) => {
             console.warn('Failed to cache WASM:', err);
           });
           
@@ -234,7 +284,7 @@ class X2TConverter {
       script.src = this.SCRIPT_PATH;
       script.onload = () => {
         this.hasScriptLoaded = true;
-        console.log('X2T WASM script loaded successfully');
+        console.warn('X2T WASM script loaded successfully');
         resolve();
       };
 
@@ -288,7 +338,7 @@ class X2TConverter {
             this.createWorkingDirectories(x2t);
             this.x2tModule = x2t;
             this.isReady = true;
-            console.log('X2T module initialized successfully');
+            console.warn('X2T module initialized successfully');
             resolve(x2t);
           } catch (error) {
             reject(error);
@@ -416,73 +466,6 @@ class X2TConverter {
   }
 
   /**
-   * 加载 xlsx 库（SheetJS）
-   */
-  private async loadXlsxLibrary(): Promise<any> {
-    // 检查是否已经加载
-    if (typeof window !== 'undefined' && (window as any).XLSX) {
-      return (window as any).XLSX;
-    }
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = '/libs/sheetjs/xlsx.full.min.js';
-      script.onload = () => {
-        if (typeof window !== 'undefined' && (window as any).XLSX) {
-          resolve((window as any).XLSX);
-        } else {
-          reject(new Error('Failed to load xlsx library'));
-        }
-      };
-      script.onerror = () => {
-        reject(new Error('Failed to load xlsx library from local file'));
-      };
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
-   * 使用 SheetJS 库将 CSV 转换为 XLSX 格式
-   * 这是解决 x2t 可能不支持直接转换 CSV 的变通方法
-   */
-  private async convertCsvToXlsx(csvData: Uint8Array, fileName: string): Promise<File> {
-    try {
-      // 加载 xlsx 库
-      const XLSX = await this.loadXlsxLibrary();
-
-      // 移除 UTF-8 BOM（如果存在）
-      let csvText: string;
-      if (csvData.length >= 3 && csvData[0] === 0xef && csvData[1] === 0xbb && csvData[2] === 0xbf) {
-        csvText = new TextDecoder('utf-8').decode(csvData.slice(3));
-      } else {
-        // 先尝试 UTF-8，如果失败则回退到其他编码
-        try {
-          csvText = new TextDecoder('utf-8').decode(csvData);
-        } catch {
-          csvText = new TextDecoder('latin1').decode(csvData);
-        }
-      }
-
-      // 使用 SheetJS 解析 CSV
-      const workbook = XLSX.read(csvText, { type: 'string', raw: false });
-
-      // 转换为 XLSX 二进制格式
-      const xlsxBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
-
-      // 创建 File 对象
-      const xlsxFileName = fileName.replace(/\.csv$/i, '.xlsx');
-      return new File([xlsxBuffer], xlsxFileName, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-    } catch (error) {
-      throw new Error(
-        `Failed to convert CSV to XLSX: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
-          'Please convert your CSV file to XLSX format manually and try again.',
-      );
-    }
-  }
-
-  /**
    * 将文档转换为 bin 格式
    */
   async convertDocument(file: File): Promise<ConversionResult> {
@@ -497,59 +480,7 @@ class X2TConverter {
       const arrayBuffer = await file.arrayBuffer();
       const data = new Uint8Array(arrayBuffer);
 
-      // 处理 CSV 文件 - x2t 可能不支持直接转换 CSV，所以先转换为 XLSX
-      if (fileExt.toLowerCase() === 'csv') {
-        if (data.length === 0) {
-          throw new Error('CSV file is empty');
-        }
-        console.log('CSV file detected. Converting to XLSX format...');
-        console.log('CSV file size:', data.length, 'bytes');
-
-        // 先将 CSV 转换为 XLSX
-        try {
-          const xlsxFile = await this.convertCsvToXlsx(data, fileName);
-          console.log('CSV converted to XLSX, now converting with x2t...');
-
-          // 现在使用 x2t 转换 XLSX 文件
-          const xlsxArrayBuffer = await xlsxFile.arrayBuffer();
-          const xlsxData = new Uint8Array(xlsxArrayBuffer);
-
-          // 使用 XLSX 文件进行转换
-          const sanitizedName = this.sanitizeFileName(xlsxFile.name);
-          const inputPath = `/working/${sanitizedName}`;
-          const outputPath = `${inputPath}.bin`;
-
-          // 将 XLSX 文件写入虚拟文件系统
-          this.x2tModule!.FS.writeFile(inputPath, xlsxData);
-
-          // 创建转换参数 - XLSX 不需要特殊参数
-          const params = this.createConversionParams(inputPath, outputPath, '');
-          this.x2tModule!.FS.writeFile('/working/params.xml', params);
-
-          // 执行转换
-          this.executeConversion('/working/params.xml');
-
-          // 读取转换结果
-          const result = this.x2tModule!.FS.readFile(outputPath);
-          const media = this.readMediaFiles();
-
-          // 返回原始 CSV 文件名，而不是 XLSX 文件名
-          return {
-            fileName: this.sanitizeFileName(fileName), // 保持原始 CSV 文件名
-            type: documentType,
-            bin: result,
-            media,
-          };
-        } catch (conversionError: any) {
-          // 如果转换失败，提供有用的错误信息
-          throw new Error(
-            `Failed to convert CSV file: ${conversionError?.message || 'Unknown error'}. ` +
-              'Please ensure your CSV file is properly formatted and try again.',
-          );
-        }
-      }
-
-      // 对于所有其他文件类型，使用标准转换
+      // 生成安全的文件名
       const sanitizedName = this.sanitizeFileName(fileName);
       const inputPath = `/working/${sanitizedName}`;
       const outputPath = `${inputPath}.bin`;
@@ -557,8 +488,8 @@ class X2TConverter {
       // 写入文件到虚拟文件系统
       this.x2tModule!.FS.writeFile(inputPath, data);
 
-      // 创建转换参数 - 非 CSV 文件不需要特殊参数
-      const params = this.createConversionParams(inputPath, outputPath, '');
+      // 创建转换参数
+      const params = this.createConversionParams(inputPath, outputPath);
       this.x2tModule!.FS.writeFile('/working/params.xml', params);
 
       // 执行转换
@@ -764,10 +695,10 @@ class X2TConverter {
       const writable = await fileHandle.createWritable();
       await writable.write(data);
       await writable.close();
-      console.log('File saved successfully:', fileName);
+      console.warn('File saved successfully:', fileName);
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
-        console.log('User cancelled the save operation');
+        console.warn('User cancelled the save operation');
         return;
       }
       throw error;
@@ -781,7 +712,7 @@ class X2TConverter {
     this.x2tModule = null;
     this.isReady = false;
     this.initPromise = null;
-    console.log('X2T converter destroyed');
+    console.warn('X2T converter destroyed');
   }
 }
 
@@ -967,7 +898,7 @@ async function onSaveInEditor(event: SaveEvent): Promise<any> {
             }
           } catch (e) {
             // base64 解码失败，使用原始字符串编码
-            console.log('Base64 decode failed, using raw string encoding');
+            console.warn('Base64 decode failed, using raw string encoding');
           }
         }
       } catch (error) {
@@ -1031,7 +962,7 @@ const media: Record<string, string> = {};
  */
 function handleWriteFile(event: any) {
   try {
-    console.log('Write file event:', event);
+    console.warn('Write file event:', event);
 
     const { data: eventData } = event;
     if (!eventData) {
@@ -1080,7 +1011,7 @@ function handleWriteFile(event: any) {
         imgName: fileName,
       },
     });
-    console.log(`Successfully processed image: ${fileName}, URL: ${media}`);
+    console.warn(`Successfully processed image: ${fileName}, URL: ${media}`);
   } catch (error) {
     console.error('Error handling writeFile:', error);
 
@@ -1129,7 +1060,7 @@ export function createEditorInstance(config: {
       container.id = containerId;
       Object.assign(container.style, ONLYOFFICE_CONTAINER_CONFIG.STYLE);
       parent.appendChild(container);
-      console.log('Container element created');
+      console.warn('Container element created');
     } else {
       // 降级方案：直接使用 body
       container = document.createElement('div');
@@ -1198,7 +1129,7 @@ export function createEditorInstance(config: {
         });
       },
       onDocumentReady: () => {
-        console.log('文档加载完成：', fileName);
+        console.warn('文档加载完成：', fileName);
         // 触发 documentReady 事件
         onlyofficeEventbus.emit(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, {
           fileName,

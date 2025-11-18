@@ -39,8 +39,8 @@ export const FILE_TYPE = {
 
 // 超时和延迟配置（单位：毫秒）
 export const READONLY_TIMEOUT_CONFIG = {
-    // X2T 初始化超时时间（10秒）
-    X2T_INIT: 10000,
+    // X2T 初始化超时时间（300秒）
+    X2T_INIT: 300000,
     // 文档保存事件等待超时时间（10秒）
     SAVE_DOCUMENT: 10000,
     // 文档准备就绪事件等待超时时间（10秒）
@@ -59,12 +59,37 @@ export const ONLYOFFICE_LANG_KEY = {
 } as const;
 
 
-export const ONLYOFFICE_CACHE_FILE = [
-    "wasm/x2t/x2t.js ",
-    "wasm/x2t/x2t.wasm",
-    "sdkjs/common/zlib/engine/zlib.wasm",
-    "sdkjs/common/libfont/engine/fonts.wasm"
+// WASM 文件缓存配置接口
+export interface CacheFileConfig {
+  // URL 匹配规则（字符串或正则表达式）
+  url: string | RegExp;
+  // 自定义处理函数，返回处理后的 URL 和压缩信息
+  event: (url: string) => {
+    fetchUrl: string;
+    isCompressed?: boolean;
+    compressionType?: 'gzip' | 'br';
+  };
+}
 
-]
+// WASM 文件缓存配置
+export const ONLYOFFICE_CACHE_FILE: CacheFileConfig[] = [
+  {
+    url: 'wasm/x2t/x2t.wasm',
+    event: (url: string) => {
+      // 对于 x2t.wasm，使用压缩版本 x2t.wasm.gz
+      if (url.includes('x2t.wasm') && !url.includes('.gz') && !url.includes('.br')) {
+        return {
+          fetchUrl: url.replace('x2t.wasm', 'x2t.wasm.gz'),
+          isCompressed: true,
+          compressionType: 'gzip',
+        };
+      }
+      return {
+        fetchUrl: url,
+        isCompressed: false,
+      };
+    },
+  },
+];
 
 export const ONLYOFFICE_INDEXEDDB_NAME = 'onlyoffice-cache';
