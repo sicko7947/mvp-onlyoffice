@@ -52,6 +52,23 @@ class EditorManager {
     return ONLYOFFICE_CONTAINER_CONFIG.STYLE;
   }
 
+  // 更新媒体文件
+  updateMedia(mediaKey: string, mediaUrl: string): void {
+    if (!this.editorConfig) {
+      this.editorConfig = {
+        fileName: '',
+        fileType: '',
+        binData: new ArrayBuffer(0),
+        media: {},
+      };
+    }
+    if (!this.editorConfig.media) {
+      this.editorConfig.media = {};
+    }
+    this.editorConfig.media[mediaKey] = mediaUrl;
+    console.log(`📷 [EditorManager] Updated media: ${mediaKey}, total: ${Object.keys(this.editorConfig.media).length}`);
+  }
+
   // 使用 Proxy 提供安全的访问接口
   private createProxy(): DocEditor {
     return new Proxy({} as DocEditor, {
@@ -280,6 +297,7 @@ class EditorManager {
         binData: this.editorConfig.binData,
         fileName: this.editorConfig.fileName,
         fileType: this.editorConfig.fileType,
+        media: this.editorConfig.media, // 包含媒体信息
       };
     }
     
@@ -297,6 +315,12 @@ class EditorManager {
       
       // 等待保存事件，使用 onlyofficeEventbus.waitFor
       const result = await onlyofficeEventbus.waitFor(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, READONLY_TIMEOUT_CONFIG.SAVE_DOCUMENT);
+      
+      // 添加媒体信息到结果中
+      if (this.editorConfig?.media) {
+        result.media = this.editorConfig.media;
+        console.log('📷 [EditorManager] Including media files in export:', Object.keys(this.editorConfig.media).length);
+      }
       
       // 触发 loading 结束事件
       
