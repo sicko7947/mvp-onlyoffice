@@ -153,7 +153,7 @@ function DocsPageContent() {
                       const binData = await editorManager.export();
                       
                       console.log(binData);
-                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.DOCX);
+                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.DOCX, binData.media);
                       console.log(buffer);
                       // 下载文件
                       const blob = new Blob([buffer.data], {

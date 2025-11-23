@@ -142,7 +142,7 @@ function PptPageContent() {
                       const binData = await editorManager.export();
                       
                       console.log('binData-ppt',binData);
-                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.PPTX);
+                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.PPTX, binData.media);
                       console.log('buffer-ppt',buffer);
                       // 下载文件
                       const blob = new Blob([buffer.data], {

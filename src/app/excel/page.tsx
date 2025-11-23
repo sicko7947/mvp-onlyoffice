@@ -155,7 +155,7 @@ function ExcelPageContent() {
                     try {
                       const binData = await editorManager.export();
                       
-                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.XLSX);
+                      const buffer = await convertBinToDocument(binData.binData, binData.fileName,FILE_TYPE.XLSX, binData.media);
                       console.log(buffer);
                       // 下载文件
                       const blob = new Blob([buffer.data], {
