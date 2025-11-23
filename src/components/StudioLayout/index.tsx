@@ -59,7 +59,7 @@ export default function StudioLayout({ children }: StudioLayoutProps) {
 
                 <div className="sidebar-footer">
                     <div className="sidebar-info">
-                        <p>Powered by Univer</p>
+                        <p>Powered by onlyoffice</p>
                         <p className="version">v1.0.0</p>
                     </div>
                 </div>
