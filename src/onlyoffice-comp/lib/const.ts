@@ -46,7 +46,7 @@ export const READONLY_TIMEOUT_CONFIG = {
     // 文档准备就绪事件等待超时时间（10秒）
     DOCUMENT_READY: 10000,
     // 只读模式切换最小延迟时间，防止切换过快导致界面闪烁
-    READONLY_SWITCH_MIN_DELAY: 100,
+    READONLY_SWITCH_MIN_DELAY: 200,
 } as const;
 
 // 向后兼容：保留旧的导出名称
