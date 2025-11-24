@@ -6,10 +6,12 @@ interface DocEditor {
   }) => void;
   destroyEditor: () => void;
 }
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_CONTAINER_CONFIG } from './const';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_EVENT_KEYS, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_CONTAINER_CONFIG } from './const';
 import { getOnlyOfficeLang } from './document-state';
 import { onlyofficeEventbus } from './eventbus';
 import { createEditorInstance } from './x2t';
+import { nanoid } from 'nanoid';
+
 // DocsAPI 类型定义
 declare global {
   interface Window {
@@ -22,6 +24,8 @@ declare global {
 // DocsAPI 类型定义在 document.d.ts 中
 
 class EditorManager {
+  private instanceId: string;
+  private containerId: string;
   private editor: DocEditor | null = null;
   private apiLoaded = false;
   private apiLoadingPromise: Promise<void> | null = null;
@@ -37,9 +41,21 @@ class EditorManager {
   } | null = null;
   private readOnly = false;
   
+  constructor(containerId?: string) {
+    // 生成唯一实例ID
+    this.instanceId = nanoid();
+    // 使用传入的容器ID或生成新的
+    this.containerId = containerId || `onlyoffice-editor-${this.instanceId}`;
+  }
+  
+  // 获取实例ID
+  getInstanceId(): string {
+    return this.instanceId;
+  }
+  
   // 获取容器 ID
   getContainerId(): string {
-    return ONLYOFFICE_CONTAINER_CONFIG.ID;
+    return this.containerId;
   }
   
   // 获取容器父元素选择器
@@ -66,7 +82,12 @@ class EditorManager {
       this.editorConfig.media = {};
     }
     this.editorConfig.media[mediaKey] = mediaUrl;
-    console.log(`📷 [EditorManager] Updated media: ${mediaKey}, total: ${Object.keys(this.editorConfig.media).length}`);
+    console.log(`📷 [EditorManager ${this.instanceId}] Updated media: ${mediaKey}, total: ${Object.keys(this.editorConfig.media).length}`);
+  }
+  
+  // 获取媒体文件映射
+  getMedia(): Record<string, string> {
+    return this.editorConfig?.media || {};
   }
 
   // 使用 Proxy 提供安全的访问接口
@@ -104,39 +125,50 @@ class EditorManager {
       onSave?: (event: any) => void;
     };
   }): DocEditor {
-
-    (window as any).ONLY_OFFICE_INSTANCE = editor;
     // 先销毁旧的编辑器
     if (this.editor) {
       try {
         this.editor.destroyEditor();
       } catch (error) {
-        console.warn('Error destroying old editor:', error);
+        console.warn(`[EditorManager ${this.instanceId}] Error destroying old editor:`, error);
       }
       this.editor = null;
     }
     
     // 确保容器元素存在（OnlyOffice 可能会删除它）
-    const containerId = ONLYOFFICE_CONTAINER_CONFIG.ID;
-    let container = document.getElementById(containerId);
+    let container = document.getElementById(this.containerId);
     
     // 如果容器不存在，尝试重新创建它
     if (!container) {
-      const parent = document.querySelector(ONLYOFFICE_CONTAINER_CONFIG.PARENT_SELECTOR);
+      // 优先查找带有 data-onlyoffice-container-id 属性的父元素（用于多实例场景）
+      let parent = document.querySelector(`[data-onlyoffice-container-id="${this.containerId}"]`);
+      
+      // 如果没有找到，尝试查找带有 data-onlyoffice-container 属性的父元素
+      if (!parent) {
+        parent = document.querySelector(`[data-onlyoffice-container="${this.instanceId}"]`);
+      }
+      
+      // 如果还是没有找到，使用通用的父元素选择器（单实例场景）
+      if (!parent) {
+        parent = document.querySelector(ONLYOFFICE_CONTAINER_CONFIG.PARENT_SELECTOR);
+      }
+      
       if (parent) {
         container = document.createElement('div');
-        container.id = containerId;
+        container.id = this.containerId;
         Object.assign(container.style, ONLYOFFICE_CONTAINER_CONFIG.STYLE);
         parent.appendChild(container);
-        console.log('Container element recreated in editor-manager');
+        console.log(`[EditorManager ${this.instanceId}] Container element created for containerId: ${this.containerId}`);
       } else {
         // 降级方案：直接使用 body
         container = document.createElement('div');
-        container.id = containerId;
+        container.id = this.containerId;
         Object.assign(container.style, ONLYOFFICE_CONTAINER_CONFIG.STYLE);
         document.body.appendChild(container);
-        console.warn('Container element recreated in body as fallback in editor-manager');
+        console.warn(`[EditorManager ${this.instanceId}] Container element created in body as fallback for containerId: ${this.containerId}`);
       }
+    } else {
+      console.log(`[EditorManager ${this.instanceId}] Using existing container: ${this.containerId}`);
     }
     
     this.editor = editor;
@@ -151,9 +183,16 @@ class EditorManager {
   // 销毁编辑器
   destroy(): void {
     if (this.editor) {
-    //   this.editor.destroyEditor();
-    //   this.editor = null;
+      try {
+        this.editor.destroyEditor();
+      } catch (error) {
+        console.warn(`[EditorManager ${this.instanceId}] Error destroying editor:`, error);
+      }
+      this.editor = null;
     }
+    // 清理配置
+    this.editorConfig = null;
+    this.readOnly = false;
   }
 
   // 获取编辑器实例（只读）
@@ -233,6 +272,8 @@ class EditorManager {
         media: this.editorConfig?.media,
         lang: getOnlyOfficeLang(),
         readOnly: false, // 明确设置为可编辑模式
+        containerId: this.containerId, // 使用当前实例的容器ID
+        editorManager: this, // 使用当前实例
       });
       onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, () => {
         onlyofficeEventbus.emit(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, { loading: false });
@@ -333,11 +374,97 @@ class EditorManager {
   }
 }
 
-// 导出单例实例
-export const editorManager = new EditorManager();
-if (typeof window !== 'undefined') {
-  (window as any).editorManager = editorManager;
+// 编辑器管理器工厂类，用于管理多个编辑器实例
+class EditorManagerFactory {
+  private instances: Map<string, EditorManager> = new Map();
+  private defaultInstance: EditorManager | null = null;
+
+  /**
+   * 创建或获取编辑器管理器实例
+   * @param containerId 容器ID，如果不提供则创建新实例
+   * @returns EditorManager 实例
+   */
+  create(containerId?: string): EditorManager {
+    if (containerId) {
+      // 如果提供了容器ID，检查是否已存在
+      let instance = this.instances.get(containerId);
+      if (!instance) {
+        instance = new EditorManager(containerId);
+        this.instances.set(containerId, instance);
+      }
+      return instance;
+    } else {
+      // 创建新实例
+      const instance = new EditorManager();
+      this.instances.set(instance.getContainerId(), instance);
+      return instance;
+    }
+  }
+
+  /**
+   * 获取编辑器管理器实例
+   * @param containerId 容器ID
+   * @returns EditorManager 实例或 null
+   */
+  get(containerId: string): EditorManager | null {
+    return this.instances.get(containerId) || null;
+  }
+
+  /**
+   * 销毁编辑器管理器实例
+   * @param containerId 容器ID
+   */
+  destroy(containerId: string): void {
+    const instance = this.instances.get(containerId);
+    if (instance) {
+      instance.destroy();
+      this.instances.delete(containerId);
+      // 清理映射（需要在 x2t.ts 中导入并清理，这里先保留）
+    }
+  }
+
+  /**
+   * 销毁所有编辑器实例
+   */
+  destroyAll(): void {
+    this.instances.forEach((instance) => {
+      instance.destroy();
+    });
+    this.instances.clear();
+    this.defaultInstance = null;
+  }
+
+  /**
+   * 获取默认实例（向后兼容）
+   */
+  getDefault(): EditorManager {
+    if (!this.defaultInstance) {
+      this.defaultInstance = new EditorManager();
+      this.instances.set(this.defaultInstance.getContainerId(), this.defaultInstance);
+    }
+    return this.defaultInstance;
+  }
+
+  /**
+   * 获取所有实例
+   */
+  getAll(): EditorManager[] {
+    return Array.from(this.instances.values());
+  }
 }
+
+// 导出工厂单例
+export const editorManagerFactory = new EditorManagerFactory();
+
+// 导出默认实例（向后兼容）
+export const editorManager = editorManagerFactory.getDefault();
+
+if (typeof window !== 'undefined') {
+  (window as any).editorManagerFactory = editorManagerFactory;
+  (window as any).editorManager = editorManager; // 向后兼容
+}
+
 // 导出类型
 export type { DocEditor };
+export { EditorManager };
 
