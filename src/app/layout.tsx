@@ -9,23 +9,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname() as string;
-
-  // 判断是否需要显示 StudioLayout（侧边栏）
-  const needsStudioLayout = 
-    pathname?.startsWith('/excel') || 
-    pathname?.startsWith('/docs') || 
-    pathname?.startsWith('/ppt') ||
-    pathname?.startsWith('/multi');
 
   return (
     <html lang="zh-CN">
       <body className="antialiased">
-        {needsStudioLayout ? (
-          <StudioLayout>{children}</StudioLayout>
-        ) : (
-          children
-        )}
+        <StudioLayout>{children}</StudioLayout>
       </body>
     </html>
   );
