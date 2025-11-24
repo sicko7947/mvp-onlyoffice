@@ -5,7 +5,7 @@ function page() {
   const router = useRouter()
   // 跳转到 excel 页面
   useEffect(() => {
-    router.push('/excel' as any)
+    router.push('/excel/base' as any)
   }, [router])
   return (
     <div>page</div>
