@@ -98,11 +98,12 @@ editorManagerFactory.destroyAll();
 // 单实例模式
 const editorManager = editorManagerFactory.getDefault();
 const result = await editorManager.export();
-// result 包含: { fileName, fileType, binData, media }
+// result 包含: { fileName, fileType, binData, instanceId, media }
 
 // 多实例模式
 const manager1 = editorManagerFactory.get('editor-1');
 const result1 = await manager1.export();
+// result1.instanceId 会匹配 manager1.getInstanceId()
 
 // 处理导出数据
 const blob = new Blob([result.binData], {
@@ -111,6 +112,10 @@ const blob = new Blob([result.binData], {
 const url = window.URL.createObjectURL(blob);
 // 执行下载或其他操作
 ```
+
+**多实例导出机制：**
+
+在多实例模式下，每个 `EditorManager` 实例的 `export()` 方法会自动过滤 `SAVE_DOCUMENT` 事件，只接收属于当前实例的保存事件（通过 `instanceId` 字段匹配）。这确保了即使多个实例同时调用 `export()`，也不会出现事件混乱或数据错位的问题。
 
 #### 只读模式控制
 
@@ -204,6 +209,7 @@ type SaveDocumentData = {
   fileName: string;      // 文件名
   fileType: string;      // 文件类型（如 'xlsx', 'docx'）
   binData: Uint8Array;   // 二进制数据
+  instanceId: string;    // 实例ID（多实例模式下用于事件匹配）
   media?: Record<string, string>; // 媒体文件映射
 }
 
