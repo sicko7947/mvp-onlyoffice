@@ -960,82 +960,6 @@ interface SaveEvent {
 }
 
 
-// 保存 文档数据到本地
-async function onSaveInEditor(event: SaveEvent): Promise<any> {
-  if (event.data && event.data.data) {
-    const { data, option } = event.data;
-    const { fileName } = getDocmentObj() || {};
-    
-    // 确保 data.data 是 Uint8Array
-    let binData: Uint8Array;
-    const rawData = data.data as any;
-    
-    if (typeof rawData === 'string') {
-      // 如果是字符串，可能是 base64 编码的数据或 OnlyOffice 内部格式
-      // OnlyOffice 的 downloadAs 方法返回的数据可能是字符串格式
-      try {
-        // 首先尝试直接使用字符串作为二进制数据
-        // 将字符串转换为 Uint8Array
-        const encoder = new TextEncoder();
-        const bytes = encoder.encode(rawData);
-        binData = bytes;
-        
-        // 如果字符串看起来像 base64（以常见 base64 字符开头），尝试解码
-        if (rawData.match(/^[A-Za-z0-9+/=]+$/)) {
-          try {
-            const binaryString = atob(rawData);
-            const decodedBytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              decodedBytes[i] = binaryString.charCodeAt(i);
-            }
-            // 如果解码后的数据看起来更合理（非空且长度合理），使用解码后的数据
-            if (decodedBytes.length > 0 && decodedBytes.length < bytes.length * 2) {
-              binData = decodedBytes;
-            }
-          } catch (e) {
-            // base64 解码失败，使用原始字符串编码
-            console.log('Base64 decode failed, using raw string encoding');
-          }
-        }
-      } catch (error) {
-        console.error('Failed to process string data:', error);
-        binData = new Uint8Array(0);
-      }
-    } else if (rawData instanceof Uint8Array) {
-      binData = rawData;
-    } else if (rawData instanceof ArrayBuffer) {
-      binData = new Uint8Array(rawData);
-    } else if (rawData && typeof rawData === 'object' && 'buffer' in rawData) {
-      // 可能是 TypedArray 或其他类似结构
-      binData = new Uint8Array(rawData.buffer || rawData);
-    } else {
-      console.error('Invalid data type in save event:', typeof rawData, rawData);
-      binData = new Uint8Array(0);
-    }
-    
-    // // 创建下载
-    // if (binData.length > 0) {
-    //   await convertBinToDocumentAndDownload(binData, fileName, c_oAscFileType2[option.outputformat]);
-    // } else {
-    //   console.error('Empty document data in save event');
-    // }
-
-
-    const result = {
-      fileName: fileName,
-      fileType: c_oAscFileType2[option.outputformat],
-      binData: binData,
-    };
-
-    // 通过 eventbus 通知
-    onlyofficeEventbus.emit(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, result);
-
-    return result;
-  }
-
-  return null;
-}
-
 // 获取文档类型
 export function getDocumentType(fileType: string): string | null {
   const type = fileType.toLowerCase();
@@ -1052,6 +976,83 @@ export function getDocumentType(fileType: string): string | null {
 
 // 全局 media 映射对象（已废弃，每个实例使用自己的media）
 const media: Record<string, string> = {};
+
+/**
+ * 创建实例特定的保存处理函数
+ * @param manager - 编辑器管理器实例
+ * @returns onSave 事件处理函数
+ */
+function createOnSaveHandler(manager: EditorManager) {
+  return async function onSaveInEditor(event: SaveEvent): Promise<any> {
+    if (event && event.data && event.data.data) {
+      const { data, option } = event.data;
+      // 使用管理器实例的配置，而不是全局的 getDocmentObj()
+      const fileName = manager.getFileName();
+      
+      // 确保 data.data 是 Uint8Array
+      let binData: Uint8Array;
+      const rawData = data.data as any;
+      
+      if (typeof rawData === 'string') {
+        // 如果是字符串，可能是 base64 编码的数据或 OnlyOffice 内部格式
+        // OnlyOffice 的 downloadAs 方法返回的数据可能是字符串格式
+        try {
+          // 首先尝试直接使用字符串作为二进制数据
+          // 将字符串转换为 Uint8Array
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(rawData);
+          binData = bytes;
+          
+          // 如果字符串看起来像 base64（以常见 base64 字符开头），尝试解码
+          if (rawData.match(/^[A-Za-z0-9+/=]+$/)) {
+            try {
+              const binaryString = atob(rawData);
+              const decodedBytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                decodedBytes[i] = binaryString.charCodeAt(i);
+              }
+              // 如果解码后的数据看起来更合理（非空且长度合理），使用解码后的数据
+              if (decodedBytes.length > 0 && decodedBytes.length < bytes.length * 2) {
+                binData = decodedBytes;
+              }
+            } catch (e) {
+              // base64 解码失败，使用原始字符串编码
+              console.log('Base64 decode failed, using raw string encoding');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to process string data:', error);
+          binData = new Uint8Array(0);
+        }
+      } else if (rawData instanceof Uint8Array) {
+        binData = rawData;
+      } else if (rawData instanceof ArrayBuffer) {
+        binData = new Uint8Array(rawData);
+      } else if (rawData && typeof rawData === 'object' && 'buffer' in rawData) {
+        // 可能是 TypedArray 或其他类似结构
+        binData = new Uint8Array(rawData.buffer || rawData);
+      } else {
+        console.error('Invalid data type in save event:', typeof rawData, rawData);
+        binData = new Uint8Array(0);
+      }
+      
+      
+      const result = {
+        fileName: fileName,
+        fileType: c_oAscFileType2[option.outputformat],
+        binData: binData,
+        instanceId: manager.getInstanceId(), // 添加实例ID
+      };
+
+      // 通过 eventbus 通知，包含实例ID
+      onlyofficeEventbus.emit(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, result);
+
+      return result;
+    }
+
+    return null;
+  };
+}
 
 /**
  * 为指定的管理器实例创建 writeFile 处理函数
@@ -1314,10 +1315,8 @@ export function createEditorInstance(config: {
         });
       },
 
-      // core: 下载
-      onSave: async (event: any) => {
-        await onSaveInEditor(event);
-      },
+      // core: 下载 - 使用实例特定的保存处理函数
+      onSave: createOnSaveHandler(manager),
     },
   });
 
@@ -1329,7 +1328,7 @@ export function createEditorInstance(config: {
     media: initialMedia || {}, // 使用初始媒体文件，如果没有则使用空对象
     readOnly,
     events: {
-      onSave: onSaveInEditor,
+      onSave: createOnSaveHandler(manager), // 使用实例特定的保存处理函数
     },
   });
   
