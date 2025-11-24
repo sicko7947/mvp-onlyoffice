@@ -48,3 +48,7 @@ section.tabs ul li:has(a[data-tab="home"]) {
 .asc-window.modal.alert {
     display: none !important;
 }
+
+.modals-mask{
+    display: none !important;
+}
