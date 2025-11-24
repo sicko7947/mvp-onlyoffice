@@ -57,6 +57,12 @@ function PptPageContent() {
       setDocmentObj({ fileName, file });
       // 确保环境已初始化（如果已初始化会立即返回）
       await initializeOnlyOffice();
+      
+      // 如果已有编辑器实例，先销毁它
+      if (editorManager.exists()) {
+        editorManager.destroy();
+      }
+      
       const { fileName: currentFileName, file: currentFile } = getDocmentObj();
       await createEditorView({
         file: currentFile,
@@ -64,6 +70,7 @@ function PptPageContent() {
         isNew: !currentFile,
         readOnly: readOnly,
         lang: getOnlyOfficeLang(),
+        containerId: ONLYOFFICE_ID, // 使用固定的容器ID
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
