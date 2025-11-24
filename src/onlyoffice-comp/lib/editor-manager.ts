@@ -320,6 +320,11 @@ class EditorManager {
     return this.readOnly;
   }
 
+  // 获取文件名
+  getFileName(): string {
+    return this.editorConfig?.fileName || '';
+  }
+
   // 打印文档
   print(): void {
     const editor = this.get();
@@ -334,11 +339,16 @@ class EditorManager {
       if (!this.editorConfig) {
         throw new Error('Editor config not available in read-only mode');
       }
+      // 确保 binData 是 Uint8Array
+      const binData = this.editorConfig.binData instanceof Uint8Array
+        ? this.editorConfig.binData
+        : new Uint8Array(this.editorConfig.binData as ArrayBuffer);
+      
       return {
-        binData: this.editorConfig.binData,
+        binData,
         fileName: this.editorConfig.fileName,
         fileType: this.editorConfig.fileType,
-        media: this.editorConfig.media, // 包含媒体信息
+        media: this.editorConfig.media || {}, // 包含媒体信息
       };
     }
     
@@ -350,25 +360,40 @@ class EditorManager {
     
     // 触发保存
     try {
-      
-      console.log('Trying downloadAs method');
+      const currentInstanceId = this.instanceId;
+      console.log(`[EditorManager ${currentInstanceId}] Trying downloadAs method`);
       (editor as any).downloadAs();
       
-      // 等待保存事件，使用 onlyofficeEventbus.waitFor
-      const result = await onlyofficeEventbus.waitFor(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, READONLY_TIMEOUT_CONFIG.SAVE_DOCUMENT);
+      // 等待保存事件，但只接收属于当前实例的事件
+      const result = await new Promise<any>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, handleSave);
+          reject(new Error(`Export timeout for instance ${currentInstanceId}`));
+        }, READONLY_TIMEOUT_CONFIG.SAVE_DOCUMENT);
+        
+        const handleSave = (data: any) => {
+          // 只处理属于当前实例的保存事件
+          if (data.instanceId === currentInstanceId) {
+            clearTimeout(timeoutId);
+            onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, handleSave);
+            resolve(data);
+          }
+          // 如果不是当前实例的事件，继续等待
+        };
+        
+        onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, handleSave);
+      });
       
       // 添加媒体信息到结果中
       if (this.editorConfig?.media) {
         result.media = this.editorConfig.media;
-        console.log('📷 [EditorManager] Including media files in export:', Object.keys(this.editorConfig.media).length);
+        console.log(`📷 [EditorManager ${currentInstanceId}] Including media files in export:`, Object.keys(this.editorConfig.media).length);
       }
-      
-      // 触发 loading 结束事件
       
       return result;
     } catch (error) {
       // 发生错误时也要关闭 loading
-      console.error('Failed to send asc_save command:', error);
+      console.error(`[EditorManager ${this.instanceId}] Failed to export:`, error);
       throw error;
     }
   }
