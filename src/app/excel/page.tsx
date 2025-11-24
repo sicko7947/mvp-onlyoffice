@@ -59,14 +59,21 @@ function ExcelPageContent() {
       setDocmentObj({ fileName, file });
       // 确保环境已初始化（如果已初始化会立即返回）
       await initializeOnlyOffice();
+      
       const { fileName: currentFileName, file: currentFile } = getDocmentObj();
+      // 传入 editorManager，让 createEditorInstance 内部处理销毁和重建
       await createEditorView({
         file: currentFile,
         fileName: currentFileName,
         isNew: !currentFile,
         readOnly: readOnly,
         lang: getOnlyOfficeLang(),
+        containerId: ONLYOFFICE_ID, // 使用固定的容器ID
+        editorManager: editorManager, // 明确使用默认管理器实例
       });
+      
+      // 强制更新UI，显示按钮
+      forceUpdate((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       console.error('Document operation failed:', err);

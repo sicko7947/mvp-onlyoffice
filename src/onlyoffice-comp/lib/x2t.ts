@@ -1,8 +1,8 @@
 import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
-import { editorManager } from './editor-manager';
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_ID, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME } from './const';
+import { editorManager, editorManagerFactory, EditorManager } from './editor-manager';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME } from './const';
 import { onlyofficeEventbus } from './eventbus';
 
 declare global {
@@ -1050,88 +1050,106 @@ export function getDocumentType(fileType: string): string | null {
 }
 
 
-// 全局 media 映射对象
+// 全局 media 映射对象（已废弃，每个实例使用自己的media）
 const media: Record<string, string> = {};
+
 /**
- * 处理文件写入请求（主要用于处理粘贴的图片）
- * @param event - OnlyOffice 编辑器的文件写入事件
+ * 为指定的管理器实例创建 writeFile 处理函数
+ * @param manager - 编辑器管理器实例
+ * @returns writeFile 事件处理函数
  */
-function handleWriteFile(event: any) {
-  try {
-    console.log('Write file event:', event);
+function createWriteFileHandler(manager: EditorManager) {
+  return function handleWriteFile(event: any) {
+    try {
+      const containerId = manager.getContainerId();
+      const instanceId = manager.getInstanceId();
+      console.log(`[WriteFile ${instanceId}] Write file event for containerId: ${containerId}`, event);
 
-    const { data: eventData } = event;
-    if (!eventData) {
-      console.warn('No data provided in writeFile event');
-      return;
-    }
+      const { data: eventData } = event;
+      if (!eventData) {
+        console.warn(`[WriteFile ${instanceId}] No data provided in writeFile event`);
+        return;
+      }
 
-    const {
-      data: imageData, // Uint8Array 图片数据
-      file: fileName, // 文件名，如 "display8image-174799443357-0.png"
-      _target, // 目标对象，包含 frameOrigin 等信息
-    } = eventData;
+      const {
+        data: imageData, // Uint8Array 图片数据
+        file: fileName, // 文件名，如 "display8image-174799443357-0.png"
+        _target, // 目标对象，包含 frameOrigin 等信息
+      } = eventData;
+      
+      console.log(`[WriteFile ${instanceId}] Processing file: ${fileName}, containerId: ${containerId}, _target:`, _target);
 
-    // 验证数据
-    if (!imageData || !(imageData instanceof Uint8Array)) {
-      throw new Error('Invalid image data: expected Uint8Array');
-    }
+      // 验证数据
+      if (!imageData || !(imageData instanceof Uint8Array)) {
+        throw new Error('Invalid image data: expected Uint8Array');
+      }
 
-    if (!fileName || typeof fileName !== 'string') {
-      throw new Error('Invalid file name');
-    }
+      if (!fileName || typeof fileName !== 'string') {
+        throw new Error('Invalid file name');
+      }
 
-    // 从文件名中提取扩展名
-    const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'png';
-    const mimeType = getMimeTypeFromExtension(fileExtension);
+      // 从文件名中提取扩展名
+      const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'png';
+      const mimeType = getMimeTypeFromExtension(fileExtension);
 
-    // 创建 Blob 对象
-    const blob = new Blob([imageData as unknown as BlobPart], { type: mimeType });
+      // 创建 Blob 对象
+      const blob = new Blob([imageData as unknown as BlobPart], { type: mimeType });
 
-    // 创建对象 URL
-    const objectUrl = window.URL.createObjectURL(blob);
-    // 将图片 URL 添加到媒体映射中，使用原始文件名作为 key
-    const mediaKey = `media/${fileName}`;
-    media[mediaKey] = objectUrl;
-    
-    // 同步更新 editorManager 中的媒体信息
-    editorManager.updateMedia(mediaKey, objectUrl);
-    
-    editorManager.get()?.sendCommand({
-      command: 'asc_setImageUrls',
-      data: {
-        urls: media,
-      },
-    });
-
-    editorManager.get()?.sendCommand({
-      command: 'asc_writeFileCallback',
-      data: {
-        // 图片 base64
-        path: objectUrl,
-        imgName: fileName,
-      },
-    });
-    console.log(`✅ [WriteFile] Processed image: ${fileName}, total media: ${Object.keys(media).length}`);
-  } catch (error) {
-    console.error('Error handling writeFile:', error);
-
-    // 通知编辑器文件处理失败
-    editorManager.get()?.sendCommand({
-      command: 'asc_writeFileCallback',
-      data: {
-        success: false,
-        error: error.message,
-      },
-    });
-
-    if (event.callback && typeof event.callback === 'function') {
-      event.callback({
-        success: false,
-        error: error.message,
+      // 创建对象 URL
+      const objectUrl = window.URL.createObjectURL(blob);
+      const mediaKey = `media/${fileName}`;
+      
+      // 更新管理器中的媒体信息
+      manager.updateMedia(mediaKey, objectUrl);
+      
+      // 获取管理器中的媒体映射
+      const managerMedia = manager.getMedia();
+      
+      // 发送命令到对应的编辑器
+      const editor = manager.get();
+      if (!editor) {
+        throw new Error('Editor instance not available');
+      }
+      
+      editor.sendCommand({
+        command: 'asc_setImageUrls',
+        data: {
+          urls: managerMedia,
+        },
       });
+
+      editor.sendCommand({
+        command: 'asc_writeFileCallback',
+        data: {
+          path: objectUrl,
+          imgName: fileName,
+        },
+      });
+      
+      console.log(`✅ [WriteFile ${manager.getInstanceId()}] Processed image: ${fileName}, total media: ${Object.keys(managerMedia).length}`);
+    } catch (error: any) {
+      console.error(`[WriteFile ${manager.getInstanceId()}] Error handling writeFile:`, error);
+
+      // 通知编辑器文件处理失败
+      const editor = manager.get();
+      if (editor) {
+        editor.sendCommand({
+          command: 'asc_writeFileCallback',
+          data: {
+            success: false,
+            error: error.message,
+          },
+        });
+      }
+
+      if (event.callback && typeof event.callback === 'function') {
+        event.callback({
+          success: false,
+          error: error.message,
+        });
+      }
     }
-  }
+  };
 }
 // 公共编辑器创建方法
 export function createEditorInstance(config: {
@@ -1141,15 +1159,46 @@ export function createEditorInstance(config: {
   media?: any;
   readOnly?: boolean; // 是否只读模式，默认为 false
   lang?: string; // 语言代码，默认为 'en'
+  containerId?: string; // 容器ID，如果不提供则使用默认容器
+  editorManager?: EditorManager; // 编辑器管理器实例，如果不提供则创建新实例
 }) {
-  const { fileName, fileType, binData, media: initialMedia, readOnly = false, lang = ONLYOFFICE_LANG_KEY.EN } = config;
+  const { fileName, fileType, binData, media: initialMedia, readOnly = false, lang = ONLYOFFICE_LANG_KEY.EN, containerId, editorManager: providedManager } = config;
+  
+  // 获取或创建编辑器管理器实例
+  let manager: EditorManager;
+  const actualContainerId = containerId || (providedManager ? providedManager.getContainerId() : undefined);
+  
+  if (providedManager) {
+    // 如果提供了管理器实例，使用它
+    manager = providedManager;
+    // 如果该管理器已有编辑器，先销毁它
+    if (manager.exists()) {
+      manager.destroy();
+    }
+  } else if (containerId) {
+    // 如果提供了容器ID，检查是否已存在实例
+    const existingManager = editorManagerFactory.get(containerId);
+    if (existingManager) {
+      // 如果已存在，先销毁它
+      existingManager.destroy();
+      editorManagerFactory.destroy(containerId);
+    }
+    // 创建新实例
+    manager = editorManagerFactory.create(containerId);
+  } else {
+    // 创建新实例
+    manager = editorManagerFactory.create();
+  }
+  
+  const finalContainerId = actualContainerId || manager.getContainerId();
+  console.log(`[CreateEditor] finalContainerId: ${finalContainerId}, actualContainerId: ${actualContainerId}, manager.containerId: ${manager.getContainerId()}, manager.instanceId: ${manager.getInstanceId()}`);
   
   // 将初始媒体文件同步到全局 media 对象
   if (initialMedia) {
     Object.keys(initialMedia).forEach(key => {
       media[key] = initialMedia[key];
     });
-    console.log(`📷 [CreateEditor] Initialized with ${Object.keys(initialMedia).length} media files`);
+    console.log(`📷 [CreateEditor ${manager.getInstanceId()}] Initialized with ${Object.keys(initialMedia).length} media files`);
   }
 
   // 确保 API 已加载
@@ -1158,30 +1207,45 @@ export function createEditorInstance(config: {
   }
 
   // 确保容器元素存在
-  const containerId = ONLYOFFICE_CONTAINER_CONFIG.ID;
-  let container = document.getElementById(containerId);
+  let container = document.getElementById(finalContainerId);
   
   // 如果容器不存在，尝试创建它
   if (!container) {
-    const parent = document.querySelector(ONLYOFFICE_CONTAINER_CONFIG.PARENT_SELECTOR);
+    // 优先查找带有 data-onlyoffice-container-id 属性的父元素（用于多实例场景）
+    let parent = document.querySelector(`[data-onlyoffice-container-id="${finalContainerId}"]`);
+    
+    // 如果没有找到，尝试查找带有 data-onlyoffice-container 属性的父元素
+    if (!parent) {
+      parent = document.querySelector(`[data-onlyoffice-container="${manager.getInstanceId()}"]`);
+    }
+    
+    // 如果还是没有找到，使用通用的父元素选择器（单实例场景）
+    if (!parent) {
+      parent = document.querySelector(ONLYOFFICE_CONTAINER_CONFIG.PARENT_SELECTOR);
+    }
+    
     if (parent) {
       container = document.createElement('div');
-      container.id = containerId;
+      container.id = finalContainerId;
       Object.assign(container.style, ONLYOFFICE_CONTAINER_CONFIG.STYLE);
       parent.appendChild(container);
-      console.log('Container element created');
+      console.log(`[CreateEditor ${manager.getInstanceId()}] Container element created in parent for containerId: ${finalContainerId}`);
     } else {
       // 降级方案：直接使用 body
       container = document.createElement('div');
-      container.id = containerId;
+      container.id = finalContainerId;
       Object.assign(container.style, ONLYOFFICE_CONTAINER_CONFIG.STYLE);
       document.body.appendChild(container);
-      console.warn('Container element created in body as fallback');
+      console.warn(`[CreateEditor ${manager.getInstanceId()}] Container element created in body as fallback for containerId: ${finalContainerId}`);
     }
+  } else {
+    // 如果容器已存在，清空它以确保干净的状态
+    container.innerHTML = '';
+    console.log(`[CreateEditor ${manager.getInstanceId()}] Using existing container: ${finalContainerId}`);
   }
 
-  // 创建编辑器实例
-  const editor = new window.DocsAPI.DocEditor(ONLYOFFICE_ID, {
+  // 创建编辑器实例，使用容器ID作为编辑器ID
+  const editor = new window.DocsAPI.DocEditor(finalContainerId, {
     document: {
       title: fileName,
       url: fileName, // 使用文件名作为标识
@@ -1223,15 +1287,16 @@ export function createEditorInstance(config: {
       },
     },
     events: {
-      writeFile: handleWriteFile,
+      writeFile: createWriteFileHandler(manager), // 为每个实例创建独立的处理函数
       onAppReady: () => {
         // 直接使用 editor 实例，因为此时编辑器还未注册到管理器
-        // 设置媒体资源 - 使用全局 media 对象
-        if (Object.keys(media).length > 0) {
-          console.log(`📷 [OnAppReady] Setting ${Object.keys(media).length} media files`);
+        // 设置媒体资源 - 使用实例特定的媒体对象
+        const instanceMedia = initialMedia || {};
+        if (Object.keys(instanceMedia).length > 0) {
+          console.log(`📷 [OnAppReady ${manager.getInstanceId()}] Setting ${Object.keys(instanceMedia).length} media files`);
           editor.sendCommand({
             command: 'asc_setImageUrls',
-            data: { urls: media },
+            data: { urls: instanceMedia },
           });
         }
         // 加载文档内容
@@ -1257,17 +1322,18 @@ export function createEditorInstance(config: {
   });
 
   // 使用管理器注册编辑器实例，保存配置以便后续切换只读模式
-  editorManager.create(editor, {
+  manager.create(editor, {
     fileName,
     fileType,
     binData,
-    media: initialMedia, // 使用初始媒体文件
+    media: initialMedia || {}, // 使用初始媒体文件，如果没有则使用空对象
     readOnly,
     events: {
       onSave: onSaveInEditor,
     },
   });
-  return editorManager
+  
+  return manager;
 }
 
 // 合并后的文件操作方法
@@ -1277,9 +1343,11 @@ export async function createEditorView(options: {
   file?: File;
   readOnly?: boolean;
   lang?: string; // 语言代码，默认为 'en'
-}): Promise<void> {
+  containerId?: string; // 容器ID，如果不提供则使用默认容器
+  editorManager?: EditorManager; // 编辑器管理器实例，如果不提供则创建新实例
+}): Promise<EditorManager> {
   try {
-    const { isNew, fileName, file, readOnly, lang = ONLYOFFICE_LANG_KEY.EN } = options;
+    const { isNew, fileName, file, readOnly, lang = ONLYOFFICE_LANG_KEY.EN, containerId, editorManager: providedManager } = options;
     const fileType = getExtensions(file?.type || '')[0] || fileName.split('.').pop() || '';
 
     // 获取文档内容
@@ -1302,21 +1370,30 @@ export async function createEditorView(options: {
       documentData = await convertDocument(file);
     }
 
-    // 创建编辑器实例, 只执行一次 setReadOnly
-    const editor =  createEditorInstance({
+    // 创建编辑器实例
+    const manager = createEditorInstance({
       fileName,
       fileType,
       binData: documentData.bin,
       media: documentData.media,
+      readOnly,
       lang,
+      containerId,
+      editorManager: providedManager,
     });
-    let hasUsed = false
-    onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, () => {
-      if(readOnly && !hasUsed){
-        editor.setReadOnly(readOnly);
-        hasUsed = true;
-      }
-    });
+    
+    // 如果需要在文档就绪后设置只读模式
+    if (readOnly) {
+      let hasUsed = false;
+      onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, () => {
+        if (!hasUsed) {
+          manager.setReadOnly(readOnly);
+          hasUsed = true;
+        }
+      });
+    }
+    
+    return manager;
   } catch (error: any) {
     console.error('文档操作失败：', error);
     alert(`文档操作失败：${error.message}`);

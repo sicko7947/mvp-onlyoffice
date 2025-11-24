@@ -14,6 +14,7 @@ const menuItems: MenuItem[] = [
     { key: 'excel', label: 'Excel', icon: '', path: '/excel' },
     { key: 'docs', label: 'Docs', icon: '', path: '/docs' },
     { key: 'ppt', label: 'PPT', icon: '', path: '/ppt' },
+    { key: 'multi', label: 'multi-instance', icon: '', path: '/multi' },
 ]
 
 interface StudioLayoutProps {
@@ -33,6 +34,7 @@ export default function StudioLayout({ children }: StudioLayoutProps) {
         if (pathname.startsWith('/excel')) return 'excel'
         if (pathname.startsWith('/docs')) return 'docs'
         if (pathname.startsWith('/ppt')) return 'ppt'
+        if (pathname.startsWith('/multi')) return 'multi'
         return ''
     }
 
