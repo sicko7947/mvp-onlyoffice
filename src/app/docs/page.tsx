@@ -58,6 +58,12 @@ function DocsPageContent() {
       setDocmentObj({ fileName, file });
       // 确保环境已初始化（如果已初始化会立即返回）
       await initializeOnlyOffice();
+      
+      // 如果已有编辑器实例，先销毁它
+      if (editorManager.exists()) {
+        editorManager.destroy();
+      }
+      
       const { fileName: currentFileName, file: currentFile } = getDocmentObj();
       await createEditorView({
         file: currentFile,
@@ -65,6 +71,7 @@ function DocsPageContent() {
         isNew: !currentFile,
         readOnly: readOnly,
         lang: getOnlyOfficeLang(),
+        containerId: ONLYOFFICE_ID, // 使用固定的容器ID
       });
       // 同步只读状态
       console.log('editorManager.getReadOnly()-zptest', editorManager.getReadOnly());

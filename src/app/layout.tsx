@@ -15,7 +15,8 @@ export default function RootLayout({
   const needsStudioLayout = 
     pathname?.startsWith('/excel') || 
     pathname?.startsWith('/docs') || 
-    pathname?.startsWith('/ppt');
+    pathname?.startsWith('/ppt') ||
+    pathname?.startsWith('/multi');
 
   return (
     <html lang="zh-CN">
