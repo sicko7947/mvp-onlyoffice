@@ -230,8 +230,10 @@ if (manager.exists()) {
 **`export()`** - 导出文档
 ```typescript
 const binData = await manager.export();
-// binData: { fileName: string, fileType: string, binData: Uint8Array, media?: Record<string, string> }
+// binData: { fileName: string, fileType: string, binData: Uint8Array, instanceId: string, media?: Record<string, string> }
 ```
+
+**注意**：在多实例模式下，`export()` 方法会自动过滤事件，只接收属于当前实例的保存事件（通过 `instanceId` 匹配），确保不会接收到其他实例的导出数据。
 
 **`setReadOnly(readOnly)`** - 设置只读模式
 ```typescript
@@ -310,7 +312,12 @@ onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, (data) => {
 // 监听文档保存事件
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, (data) => {
   console.log('文档已保存:', data.fileName);
-  // data: { fileName: string, fileType: string, binData: Uint8Array }
+  // data: { fileName: string, fileType: string, binData: Uint8Array, instanceId: string, media?: Record<string, string> }
+  
+  // 多实例模式下，可以通过 instanceId 判断是哪个实例的保存事件
+  if (data.instanceId === manager.getInstanceId()) {
+    // 这是当前实例的保存事件
+  }
 });
 
 // 监听 Loading 状态变化事件（用于导出等操作）
@@ -587,9 +594,11 @@ type DocumentReadyData = {
 #### `SaveDocumentData`
 ```typescript
 type SaveDocumentData = {
-  fileName: string;
-  fileType: string;
-  binData: Uint8Array;
+  fileName: string;      // 文件名
+  fileType: string;      // 文件类型（如 'xlsx', 'docx'）
+  binData: Uint8Array;   // 二进制数据
+  instanceId: string;    // 实例ID（多实例模式下用于事件匹配）
+  media?: Record<string, string>; // 媒体文件映射（可选）
 };
 ```
 

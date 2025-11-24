@@ -1,77 +1,151 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { Layout, Menu } from 'antd'
+import type { MenuProps } from 'antd'
+import {
+  FileExcelOutlined,
+  FileWordOutlined,
+  FilePptOutlined,
+  AppstoreOutlined,
+  FolderOutlined,
+} from '@ant-design/icons'
 import './styles.css'
 
-interface MenuItem {
-    key: string
-    label: string
-    icon: string
-    path: string
-}
+const { Sider } = Layout
 
-const menuItems: MenuItem[] = [
-    { key: 'excel', label: 'Excel', icon: '', path: '/excel' },
-    { key: 'docs', label: 'Docs', icon: '', path: '/docs' },
-    { key: 'ppt', label: 'PPT', icon: '', path: '/ppt' },
-    { key: 'multi', label: 'multi-instance', icon: '', path: '/multi' },
+const menuItems: MenuProps['items'] = [
+  {
+    key: '/excel',
+    icon: <FileExcelOutlined />,
+    label: 'Excel',
+    children: [
+      {
+        key: '/excel/base',
+        icon: <FolderOutlined />,
+        label: 'Base',
+      },
+    ],
+  },
+  {
+    key: '/docs',
+    icon: <FileWordOutlined />,
+    label: 'Docs',
+    children: [
+      {
+        key: '/docs/base',
+        icon: <FolderOutlined />,
+        label: 'Base',
+      },
+    ],
+  },
+  {
+    key: '/ppt',
+    icon: <FilePptOutlined />,
+    label: 'PPT',
+    children: [
+      {
+        key: '/ppt/base',
+        icon: <FolderOutlined />,
+        label: 'Base',
+      },
+    ],
+  },
+  {
+    key: '/multi',
+    icon: <AppstoreOutlined />,
+    label: 'Multi Instance',
+    children: [
+      {
+        key: '/multi/base',
+        icon: <FolderOutlined />,
+        label: 'Base',
+      },
+      {
+        key: '/multi/tabs',
+        icon: <FolderOutlined />,
+        label: 'Tab Cache',
+      },
+    ],
+  },
 ]
 
 interface StudioLayoutProps {
-    children: React.ReactNode
+  children: React.ReactNode
 }
 
 export default function StudioLayout({ children }: StudioLayoutProps) {
-    const pathname = usePathname()
-    const router = useRouter()
+  const pathname = usePathname()
+  const router = useRouter()
+  const [openKeys, setOpenKeys] = useState<string[]>([])
 
-    const handleMenuClick = (path: string) => {
-        router.push(path)
+  // 根据路径自动展开对应的菜单并选中菜单项
+  useEffect(() => {
+    if (!pathname) return
+
+    // 所有可能的路径映射
+    const routeMap: Record<string, { selected: string; parent: string }> = {
+      '/excel/base': { selected: '/excel/base', parent: '/excel' },
+      '/docs/base': { selected: '/docs/base', parent: '/docs' },
+      '/ppt/base': { selected: '/ppt/base', parent: '/ppt' },
+      '/multi/base': { selected: '/multi/base', parent: '/multi' },
+      '/multi/tabs': { selected: '/multi/tabs', parent: '/multi' },
     }
 
-    // 获取当前激活的菜单项
-    const getActiveKey = () => {
-        if (pathname.startsWith('/excel')) return 'excel'
-        if (pathname.startsWith('/docs')) return 'docs'
-        if (pathname.startsWith('/ppt')) return 'ppt'
-        if (pathname.startsWith('/multi')) return 'multi'
-        return ''
+    // 精确匹配路径
+    const match = routeMap[pathname]
+    if (match) {
+      setOpenKeys([match.parent])
     }
+  }, [pathname])
 
-    return (
-        <div className="studio-layout">
-            {/* 左侧边栏 */}
-            <aside className="studio-sidebar">
-                <div className="sidebar-header">
-                    <h2 className="sidebar-title">onlyoffice Studio</h2>
-                </div>
-                
-                <nav className="sidebar-nav">
-                    {menuItems.map(item => (
-                        <button
-                            key={item.key}
-                            className={`nav-item ${getActiveKey() === item.key ? 'active' : ''}`}
-                            onClick={() => handleMenuClick(item.path)}
-                        >
-                            <span className="nav-icon">{item.icon}</span>
-                            <span className="nav-label">{item.label}</span>
-                        </button>
-                    ))}
-                </nav>
+  // 获取当前选中的菜单项
+  const getSelectedKeys = (): string[] => {
+    if (!pathname) return []
+    return [pathname]
+  }
 
-                <div className="sidebar-footer">
-                    <div className="sidebar-info">
-                        <p>Powered by onlyoffice</p>
-                        <p className="version">v1.0.0</p>
-                    </div>
-                </div>
-            </aside>
+  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    router.push(key as string)
+  }
 
-            {/* 右侧内容区域 */}
-            <main className="studio-main-content">
-                {children}
-            </main>
+  const handleOpenChange: MenuProps['onOpenChange'] = (keys) => {
+    setOpenKeys(keys)
+  }
+
+  return (
+    <Layout className="studio-layout">
+      <Sider
+        width={240}
+        className="studio-sidebar"
+        theme="light"
+      >
+        <div className="sidebar-header">
+          <h2 className="sidebar-title">OnlyOffice Studio</h2>
         </div>
-    )
-}
+        
+        <Menu
+          mode="inline"
+          selectedKeys={getSelectedKeys()}
+          openKeys={openKeys}
+          items={menuItems}
+          onClick={handleMenuClick}
+          onOpenChange={handleOpenChange}
+          className="sidebar-menu"
+        />
 
+        <div className="sidebar-footer">
+          <div className="sidebar-info">
+            <p>Powered by OnlyOffice</p>
+            <p className="version">v1.0.0</p>
+          </div>
+        </div>
+      </Sider>
+
+      <Layout className="studio-main-content">
+        {children}
+      </Layout>
+    </Layout>
+  )
+}
