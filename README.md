@@ -12,6 +12,7 @@
 - 💻 **零部署成本**: 采用客户端架构，无需搭建服务器环境
 - ⚡ **快速启动**: 访问页面即可立即使用，无需额外配置
 - 🌏 **国际化**: 内置多语言界面，可自由切换显示语言
+- 🎯 **多实例支持**: 支持同时运行多个独立编辑器实例，资源完全隔离
 
 ## 📘 使用指南
 
@@ -37,14 +38,17 @@
 
 ## 🔌 API 接口说明
 
-### 编辑器管理器 (EditorManager)
+### 编辑器管理器 (EditorManager & EditorManagerFactory)
 
-编辑器管理器提供了完整的文档操作接口，支持创建、销毁、导出等核心功能。
+编辑器管理器提供了完整的文档操作接口，支持创建、销毁、导出等核心功能。支持单实例和多实例两种模式。
 
-#### 基本方法
+#### 单实例模式（向后兼容）
 
 ```typescript
-import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
+import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
+
+// 获取默认实例
+const editorManager = editorManagerFactory.getDefault();
 
 // 检查编辑器是否已创建
 const exists = editorManager.exists();
@@ -54,6 +58,28 @@ const editor = editorManager.get();
 
 // 销毁编辑器
 editorManager.destroy();
+```
+
+#### 多实例模式
+
+```typescript
+import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
+
+// 创建或获取指定容器ID的实例
+const manager1 = editorManagerFactory.create('editor-1');
+const manager2 = editorManagerFactory.create('editor-2');
+
+// 获取指定容器ID的实例
+const manager = editorManagerFactory.get('editor-1');
+
+// 获取所有实例
+const allManagers = editorManagerFactory.getAll();
+
+// 销毁指定实例
+editorManagerFactory.destroy('editor-1');
+
+// 销毁所有实例
+editorManagerFactory.destroyAll();
 ```
 
 #### 文档导出
@@ -69,9 +95,14 @@ editorManager.destroy();
 **代码示例：**
 
 ```typescript
-// 导出文档，返回 Promise
+// 单实例模式
+const editorManager = editorManagerFactory.getDefault();
 const result = await editorManager.export();
 // result 包含: { fileName, fileType, binData, media }
+
+// 多实例模式
+const manager1 = editorManagerFactory.get('editor-1');
+const result1 = await manager1.export();
 
 // 处理导出数据
 const blob = new Blob([result.binData], {
@@ -137,13 +168,23 @@ const saveData = await onlyofficeEventbus.waitFor(
 ```typescript
 import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
-// 创建编辑器视图
+// 单实例模式：创建编辑器视图（使用默认容器）
 await createEditorView({
   file: fileObject,        // File 对象（可选）
   fileName: 'document.xlsx', // 文件名
   isNew: false,            // 是否新建文档
   readOnly: false,        // 是否只读
   lang: 'zh',             // 界面语言
+});
+
+// 多实例模式：创建编辑器视图（指定容器ID）
+const manager1 = await createEditorView({
+  file: fileObject,
+  fileName: 'document.xlsx',
+  isNew: false,
+  readOnly: false,
+  lang: 'zh',
+  containerId: 'editor-1', // 指定容器ID
 });
 
 // 转换文档格式
@@ -237,10 +278,11 @@ mvp-onlyoffice/
 │   ├── app/              # Next.js 应用页面
 │   │   ├── excel/        # Excel 编辑器页面
 │   │   ├── docs/         # Word 编辑器页面
-│   │   └── ppt/          # PowerPoint 编辑器页面
+│   │   ├── ppt/          # PowerPoint 编辑器页面
+│   │   └── multi/        # 多实例演示页面
 │   ├── onlyoffice-comp/  # OnlyOffice 组件库
 │   │   └── lib/
-│   │       ├── editor-manager.ts  # 编辑器管理器
+│   │       ├── editor-manager.ts  # 编辑器管理器（支持多实例）
 │   │       ├── x2t.ts             # 文档转换模块
 │   │       ├── eventbus.ts        # 事件总线
 │   │       └── ...

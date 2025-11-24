@@ -25,23 +25,36 @@ await initializeOnlyOffice();
 
 ### 2. 创建编辑器视图
 
-创建编辑器视图有两种方式：新建文档或打开现有文档。
+创建编辑器视图有两种方式：新建文档或打开现有文档。支持单实例和多实例两种模式。
 
 ```typescript
 import { createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
-// 新建文档
+// 单实例模式：新建文档（使用默认容器）
 await createEditorView({
   isNew: true,
   fileName: 'New_Document.docx',
 });
 
-// 打开现有文档
+// 单实例模式：打开现有文档
 const file = new File([...], 'document.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 await createEditorView({
   isNew: false,
   fileName: 'document.docx',
   file: file,
+});
+
+// 多实例模式：指定容器ID
+const manager1 = await createEditorView({
+  isNew: true,
+  fileName: 'Doc1.docx',
+  containerId: 'editor-1', // 指定容器ID
+});
+
+const manager2 = await createEditorView({
+  isNew: true,
+  fileName: 'Doc2.xlsx',
+  containerId: 'editor-2', // 不同的容器ID
 });
 ```
 
@@ -49,6 +62,7 @@ await createEditorView({
 
 在 React 组件中添加编辑器容器：
 
+**单实例模式：**
 ```tsx
 import { ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 
@@ -60,6 +74,32 @@ export default function EditorPage() {
   );
 }
 ```
+
+**多实例模式：**
+```tsx
+export default function MultiEditorPage() {
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {/* 第一个编辑器容器 */}
+      <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-1">
+        <div id="editor-1" className="absolute inset-0" />
+      </div>
+      
+      {/* 第二个编辑器容器 */}
+      <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-2">
+        <div id="editor-2" className="absolute inset-0" />
+      </div>
+      
+      {/* 第三个编辑器容器 */}
+      <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-3">
+        <div id="editor-3" className="absolute inset-0" />
+      </div>
+    </div>
+  );
+}
+```
+
+**注意**：多实例模式下，必须使用 `data-onlyoffice-container-id` 属性来精确定位容器，避免图片上传等操作路由到错误的实例。
 
 ## 核心 API
 
@@ -80,81 +120,143 @@ await initializeOnlyOffice();
 
 ### `createEditorView(options)`
 
-创建编辑器视图，支持新建或打开文档。
+创建编辑器视图，支持新建或打开文档。支持单实例和多实例两种模式。
 
 ```typescript
 import { createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
 await createEditorView({
-  isNew: boolean;      // 是否新建文档
-  fileName: string;    // 文件名（包含扩展名）
-  file?: File;        // 文件对象（打开现有文档时必需）
+  isNew: boolean;           // 是否新建文档
+  fileName: string;         // 文件名（包含扩展名）
+  file?: File;             // 文件对象（打开现有文档时必需）
+  readOnly?: boolean;       // 是否只读模式，默认为 false
+  lang?: string;           // 界面语言，默认为 'en'
+  containerId?: string;    // 容器ID（多实例模式必需，单实例模式可选）
+  editorManager?: EditorManager; // 编辑器管理器实例（可选）
 });
 ```
 
-**返回值：** `Promise<void>` - 文档准备就绪后 resolve
+**返回值：** `Promise<EditorManager>` - 返回编辑器管理器实例
+
+**单实例模式：**
+```typescript
+// 不指定 containerId，使用默认容器
+await createEditorView({
+  isNew: true,
+  fileName: 'document.docx',
+});
+```
+
+**多实例模式：**
+```typescript
+// 指定 containerId，创建独立实例
+const manager = await createEditorView({
+  isNew: true,
+  fileName: 'document.docx',
+  containerId: 'editor-1', // 必须指定唯一的容器ID
+});
+```
 
 **支持的文件类型：**
 - Word: `.docx`, `.doc`, `.odt`, `.rtf`, `.txt`
 - Excel: `.xlsx`, `.xls`, `.ods`, `.csv`
 - PowerPoint: `.pptx`, `.ppt`, `.odp`
 
-### `editorManager`
+### `editorManagerFactory` 和 `EditorManager`
 
-编辑器管理器，提供编辑器的操作和控制功能。
+编辑器管理器工厂和编辑器管理器，提供编辑器的操作和控制功能。
+
+#### 单实例模式（向后兼容）
 
 ```typescript
-import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
+import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
+
+// 获取默认实例
+const editorManager = editorManagerFactory.getDefault();
+
+// 检查编辑器是否存在
+if (editorManager.exists()) {
+  // 编辑器已创建
+}
+
+// 导出文档
+const binData = await editorManager.export();
+// binData: { fileName: string, fileType: string, binData: Uint8Array, media?: Record<string, string> }
+
+// 设置只读模式
+await editorManager.setReadOnly(true);  // 设置为只读
+await editorManager.setReadOnly(false); // 设置为可编辑
+
+// 获取当前只读状态
+const isReadOnly = editorManager.getReadOnly();
+
+// 销毁编辑器实例
+editorManager.destroy();
 ```
 
-#### `editorManager.exists()`
-
-检查编辑器是否存在。
+#### 多实例模式
 
 ```typescript
-if (editorManager.exists()) {
+import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
+
+// 创建或获取指定容器ID的实例
+const manager1 = editorManagerFactory.create('editor-1');
+const manager2 = editorManagerFactory.create('editor-2');
+
+// 获取指定容器ID的实例
+const manager = editorManagerFactory.get('editor-1');
+
+// 获取所有实例
+const allManagers = editorManagerFactory.getAll();
+
+// 销毁指定实例
+editorManagerFactory.destroy('editor-1');
+
+// 销毁所有实例
+editorManagerFactory.destroyAll();
+```
+
+#### `EditorManager` 实例方法
+
+每个 `EditorManager` 实例都提供以下方法：
+
+**`exists()`** - 检查编辑器是否存在
+```typescript
+if (manager.exists()) {
   // 编辑器已创建
 }
 ```
 
-#### `editorManager.export()`
-
-导出文档，返回文档的二进制数据。
-
+**`export()`** - 导出文档
 ```typescript
-const binData = await editorManager.export();
-// binData: { fileName: string, fileType: string, binData: Uint8Array }
+const binData = await manager.export();
+// binData: { fileName: string, fileType: string, binData: Uint8Array, media?: Record<string, string> }
 ```
 
-**返回值：** `Promise<{ fileName: string, fileType: string, binData: Uint8Array }>`
-
-#### `editorManager.setReadOnly(readOnly)`
-
-设置编辑器为只读或可编辑模式。
-
+**`setReadOnly(readOnly)`** - 设置只读模式
 ```typescript
-await editorManager.setReadOnly(true);  // 设置为只读
-await editorManager.setReadOnly(false); // 设置为可编辑
+await manager.setReadOnly(true);  // 设置为只读
+await manager.setReadOnly(false); // 设置为可编辑
 ```
 
-#### `editorManager.getReadOnly()`
-
-获取当前只读状态。
-
+**`getReadOnly()`** - 获取当前只读状态
 ```typescript
-const isReadOnly = editorManager.getReadOnly();
+const isReadOnly = manager.getReadOnly();
 ```
 
-#### `editorManager.print()`
-
-
-
-#### `editorManager.destroy()`
-
-销毁编辑器实例。
-
+**`getInstanceId()`** - 获取实例的唯一ID
 ```typescript
-editorManager.destroy();
+const instanceId = manager.getInstanceId();
+```
+
+**`getContainerId()`** - 获取容器的ID
+```typescript
+const containerId = manager.getContainerId();
+```
+
+**`destroy()`** - 销毁编辑器实例
+```typescript
+manager.destroy();
 ```
 
 ### `convertBinToDocument()`
@@ -290,9 +392,12 @@ import { useEffect, useRef, useState } from 'react';
 import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
 import { setDocmentObj, getDocmentObj } from '@/onlyoffice-comp/lib/document-state';
-import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
+import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
+
+// 获取默认实例（向后兼容）
+const editorManager = editorManagerFactory.getDefault();
 
 export default function EditorPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -371,6 +476,7 @@ export default function EditorPage() {
     return () => {
       onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
       editorManager.destroy();
+      // 或者销毁所有实例：editorManagerFactory.destroyAll();
     };
   }, []);
 
@@ -497,10 +603,14 @@ type LoadingChangeData = {
 ## 注意事项
 
 1. **初始化顺序**：必须先调用 `initializeOnlyOffice()` 再创建编辑器
-2. **容器元素**：确保页面中存在 ID 为 `ONLYOFFICE_ID` 的容器元素
+2. **容器元素**：
+   - 单实例模式：确保页面中存在 ID 为 `ONLYOFFICE_ID` 的容器元素
+   - 多实例模式：确保每个实例使用唯一的容器ID，并使用 `data-onlyoffice-container-id` 属性精确定位
 3. **文件类型**：确保文件扩展名与文件内容匹配
 4. **事件清理**：在组件卸载时记得取消事件监听和销毁编辑器
 5. **异步操作**：所有 API 都是异步的，需要使用 `await` 或 `.then()` 处理
+6. **多实例资源隔离**：每个编辑器实例管理独立的媒体资源，图片上传通过独立的 `writeFile` 处理函数
+7. **容器ID唯一性**：多实例模式下，每个编辑器实例必须使用唯一的容器ID
 
 ## 支持的文件格式
 
