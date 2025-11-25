@@ -17,6 +17,12 @@
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
+.studio-sidebar .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 /* 侧边栏头部 */
 .sidebar-header {
   padding: 20px 16px;
@@ -42,6 +48,8 @@
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid #f0f0f0;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .sidebar-info {
@@ -56,6 +64,28 @@
 
 .version {
   color: #bbb;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  color: #666;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+
+.github-link:hover {
+  color: #1890ff;
+  background-color: #f0f7ff;
+}
+
+.github-link .anticon {
+  font-size: 14px;
 }
 
 /* ============================================

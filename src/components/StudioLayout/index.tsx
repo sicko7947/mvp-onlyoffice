@@ -10,6 +10,7 @@ import {
   FilePptOutlined,
   AppstoreOutlined,
   FolderOutlined,
+  GithubOutlined,
 } from '@ant-design/icons'
 import './styles.css'
 
@@ -139,6 +140,15 @@ export default function StudioLayout({ children }: StudioLayoutProps) {
           <div className="sidebar-info">
             <p>Powered by OnlyOffice</p>
             <p className="version">v1.0.0</p>
+            <a
+              href="https://github.com/electroluxcode/mvp-onlyoffice"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="github-link"
+              title="查看 GitHub 仓库"
+            >
+              <GithubOutlined /> GitHub
+            </a>
           </div>
         </div>
       </Sider>
