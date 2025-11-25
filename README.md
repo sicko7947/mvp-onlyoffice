@@ -19,9 +19,15 @@
 ### 快速开始
 
 1. 访问 [在线编辑器](https://mvp-onlyoffice.vercel.app/)
-2. 上传本地文件
-3. 在浏览器中直接编辑文档内容
-4. 完成编辑后导出保存文档
+2. 选择编辑器类型：
+   - `/excel/base` - Excel 电子表格编辑器
+   - `/docs/base` - Word 文档编辑器
+   - `/ppt/base` - PowerPoint 演示文稿编辑器
+   - `/multi/base` - 多实例基础演示（同时运行多个编辑器）
+   - `/multi/tabs` - 多实例 Tab 演示（带缓存管理）
+3. 上传本地文件
+4. 在浏览器中直接编辑文档内容
+5. 完成编辑后导出保存文档
 
 ### URL 参数配置
 
@@ -282,10 +288,16 @@ npm run dev
 mvp-onlyoffice/
 ├── src/
 │   ├── app/              # Next.js 应用页面
-│   │   ├── excel/        # Excel 编辑器页面
-│   │   ├── docs/         # Word 编辑器页面
-│   │   ├── ppt/          # PowerPoint 编辑器页面
-│   │   └── multi/        # 多实例演示页面
+│   │   ├── excel/
+│   │   │   └── base/     # Excel 编辑器页面 (/excel/base)
+│   │   ├── docs/
+│   │   │   └── base/     # Word 编辑器页面 (/docs/base)
+│   │   ├── ppt/
+│   │   │   └── base/     # PowerPoint 编辑器页面 (/ppt/base)
+│   │   ├── multi/
+│   │   │   ├── base/     # 多实例基础演示页面 (/multi/base)
+│   │   │   └── tabs/     # 多实例 Tab 演示页面 (/multi/tabs)
+│   │   └── page.tsx      # 首页（重定向到 /excel/base）
 │   ├── onlyoffice-comp/  # OnlyOffice 组件库
 │   │   └── lib/
 │   │       ├── editor-manager.ts  # 编辑器管理器（支持多实例）
@@ -299,6 +311,15 @@ mvp-onlyoffice/
 │   └── wasm/             # WebAssembly 转换器
 └── onlyoffice-x2t-wasm/  # x2t-wasm 源码
 ```
+
+### 页面路由说明
+
+- `/` - 首页，自动重定向到 `/excel/base`
+- `/excel/base` - Excel 电子表格编辑器（单实例模式）
+- `/docs/base` - Word 文档编辑器（单实例模式）
+- `/ppt/base` - PowerPoint 演示文稿编辑器（单实例模式）
+- `/multi/base` - 多实例基础演示，展示同时运行多个独立编辑器实例
+- `/multi/tabs` - 多实例 Tab 演示，展示带 LRU 缓存管理的多 Tab 编辑器实现
 
 ## 🔤 字体配置
 
