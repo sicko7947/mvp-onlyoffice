@@ -22,6 +22,7 @@ export const ONLYOFFICE_CONTAINER_CONFIG = {
 export const ONLYOFFICE_RESOURCE = {
     DOCUMENTS: '/packages/onlyoffice/7/web-apps/apps/api/documents/api.js',
     X2T: '/packages/onlyoffice/7/wasm/x2t/x2t.js',
+    XLSX: '/packages/onlyoffice/7/libs/sheetjs/xlsx.full.min.js',
 }
 
 // EventBus 事件名称
