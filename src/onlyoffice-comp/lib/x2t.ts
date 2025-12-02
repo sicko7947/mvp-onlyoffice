@@ -177,40 +177,67 @@ class X2TConverter {
         return originalFetch(input, init);
       }
 
-      // 拦截所有 
-      if (ONLYOFFICE_CACHE_FILE.some((file:any) => url.includes(file))) {
-        // 先尝试从缓存读取
+      // 拦截所有 WASM 文件请求
+      const cacheConfig = ONLYOFFICE_CACHE_FILE.find((file: any) => {
+        if (typeof file.url === 'string') {
+          return url.includes(file.url);
+        } else if (file.url instanceof RegExp) {
+          return file.url.test(url);
+        }
+        return false;
+      });
+
+      if (cacheConfig) {
+        // 调用 event 函数处理 URL，获取压缩版本
+        const { fetchUrl, isCompressed, compressionType } = cacheConfig.event(url);
+        
+        // 先尝试从缓存读取（使用原始 URL 作为缓存 key）
         const cached = await (this as any).getCachedWasm(url);
         if (cached) {
           console.log('onlyoffice: Loading WASM from IndexedDB cache:', url);
           return new Response(cached, {
-            headers: {
-              'Content-Type': 'application/wasm',
-            },
+            headers: { 'Content-Type': 'application/wasm' },
           });
         }
+        
         // 缓存未命中，从网络加载
-        console.log('onlyoffice: Loading WASM from network:', url);
-        const response = await originalFetch(input, init);
+        console.log('onlyoffice: Loading WASM from network:', fetchUrl, isCompressed ? `(${compressionType})` : '');
         
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
-          
-          // 缓存到 IndexedDB（异步，不阻塞响应）
-          (this as any).cacheWasm(url, arrayBuffer).catch((err: any) => {
-            console.warn('Failed to cache WASM:', err);
-          });
-          
-          return new Response(arrayBuffer, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: {
-              'Content-Type': 'application/wasm',
-            },
-          });
+        // 构建请求：如果 URL 不同则构建新请求，否则使用原请求
+        const fetchInput = fetchUrl !== url 
+          ? (typeof input === 'string' 
+              ? fetchUrl 
+              : new Request(fetchUrl, input instanceof Request ? input : undefined))
+          : input;
+        
+        const response = await originalFetch(fetchInput, init);
+        
+        if (!response.ok) {
+          return response;
         }
         
-        return response;
+        let arrayBuffer = await response.arrayBuffer();
+        
+        // 如果是压缩文件，需要解压
+        if (isCompressed && compressionType === 'gzip') {
+          const decompressionStream = new DecompressionStream('gzip');
+          const stream = new Response(arrayBuffer).body?.pipeThrough(decompressionStream);
+          if (stream) {
+            const decompressedResponse = new Response(stream);
+            arrayBuffer = await decompressedResponse.arrayBuffer();
+          }
+        }
+        
+        // 缓存到 IndexedDB（使用原始 URL 作为 key，存储解压后的数据）
+        (this as any).cacheWasm(url, arrayBuffer).catch((err: any) => {
+          console.warn('Failed to cache WASM:', err);
+        });
+        
+        return new Response(arrayBuffer, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: { 'Content-Type': 'application/wasm' },
+        });
       }
 
       return originalFetch(input, init);
