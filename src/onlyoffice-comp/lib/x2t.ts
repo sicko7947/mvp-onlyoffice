@@ -426,7 +426,7 @@ class X2TConverter {
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '/libs/sheetjs/xlsx.full.min.js';
+      script.src = ONLYOFFICE_RESOURCE.XLSX;
       script.onload = () => {
         if (typeof window !== 'undefined' && (window as any).XLSX) {
           resolve((window as any).XLSX);
