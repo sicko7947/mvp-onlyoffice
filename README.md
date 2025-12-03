@@ -1,371 +1,370 @@
 # MVP OnlyOffice
 
-> 📖 [English](README.en.md) | 中文
+> 📖 English | [中文](README.zh.md)
 
-🌐 **在线演示**: https://mvp-onlyoffice.vercel.app/
+🌐 **Live Demo**: https://mvp-onlyoffice.vercel.app/
 
-基于 OnlyOffice 技术栈构建的浏览器端文档处理解决方案，支持在客户端完成文档的查看、编辑与转换，所有操作均在用户设备上执行，无需依赖后端服务。
+A browser-based document processing solution built on the OnlyOffice technology stack, supporting document viewing, editing, and conversion entirely on the client side. All operations are performed on the user's device without requiring backend services.
 
-## 🎯 核心优势
+## 🎯 Core Advantages
 
-- 🛡️ **数据安全**: 文档处理流程完全在浏览器内完成，数据不会离开本地环境
-- 📄 **格式兼容**: 全面支持 Word、Excel、PowerPoint 等主流办公文档格式
-- 🔄 **即时响应**: 提供流畅的文档编辑交互体验
-- 💻 **零部署成本**: 采用客户端架构，无需搭建服务器环境
-- ⚡ **快速启动**: 访问页面即可立即使用，无需额外配置
-- 🌏 **国际化**: 内置多语言界面，可自由切换显示语言
-- 🎯 **多实例支持**: 支持同时运行多个独立编辑器实例，资源完全隔离
+- 🛡️ **Data Security**: Document processing is completed entirely within the browser, data never leaves the local environment
+- 📄 **Format Compatibility**: Comprehensive support for mainstream office document formats including Word, Excel, PowerPoint, and more
+- 🔄 **Instant Response**: Provides smooth document editing interaction experience
+- 💻 **Zero Deployment Cost**: Client-side architecture, no server setup required
+- ⚡ **Quick Start**: Access the page and use immediately, no additional configuration needed
+- 🌏 **Internationalization**: Built-in multi-language interface with free language switching
+- 🎯 **Multi-Instance Support**: Supports running multiple independent editor instances simultaneously with complete resource isolation
 
-## 📘 使用指南
+## 📘 User Guide
 
-### 快速开始
+### Quick Start
 
-1. 访问 [在线编辑器](https://mvp-onlyoffice.vercel.app/)
-2. 选择编辑器类型：
-   - `/excel/base` - Excel 电子表格编辑器
-   - `/docs/base` - Word 文档编辑器
-   - `/ppt/base` - PowerPoint 演示文稿编辑器
-   - `/multi/base` - 多实例基础演示（同时运行多个编辑器）
-   - `/multi/tabs` - 多实例 Tab 演示（带缓存管理）
-3. 上传本地文件
-4. 在浏览器中直接编辑文档内容
-5. 完成编辑后导出保存文档
+1. Visit the [Online Editor](https://mvp-onlyoffice.vercel.app/)
+2. Select editor type:
+   - `/excel/base` - Excel spreadsheet editor
+   - `/docs/base` - Word document editor
+   - `/ppt/base` - PowerPoint presentation editor
+   - `/multi/base` - Multi-instance basic demo (running multiple editors simultaneously)
+   - `/multi/tabs` - Multi-instance Tab demo (with cache management)
+3. Upload local files
+4. Edit document content directly in the browser
+5. Export and save the document after editing
 
-### URL 参数配置
+### URL Parameter Configuration
 
-| 参数名   | 功能说明         | 可选值     | 优先级 |
-| -------- | ---------------- | ---------- | ------ |
-| `locale` | 指定界面显示语言 | `en`, `zh` | -      |
+| Parameter | Description              | Values      | Priority |
+| --------- | ------------------------ | ----------- | -------- |
+| `locale`  | Specify interface language | `en`, `zh` | -        |
 
-**使用示例：**
+**Usage Example:**
 
 ```bash
-# 设置中文界面
-?locale=zh
+# Set English interface
+?locale=en
 ```
 
-## 🔌 API 接口说明
+## 🔌 API Documentation
 
-### 编辑器管理器 (EditorManager & EditorManagerFactory)
+### Editor Manager (EditorManager & EditorManagerFactory)
 
-编辑器管理器提供了完整的文档操作接口，支持创建、销毁、导出等核心功能。支持单实例和多实例两种模式。
+The editor manager provides a complete document operation interface, supporting core functions such as creation, destruction, and export. Supports both single-instance and multi-instance modes.
 
-#### 单实例模式（向后兼容）
+#### Single-Instance Mode (Backward Compatible)
 
 ```typescript
 import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 
-// 获取默认实例
+// Get default instance
 const editorManager = editorManagerFactory.getDefault();
 
-// 检查编辑器是否已创建
+// Check if editor has been created
 const exists = editorManager.exists();
 
-// 获取编辑器实例
+// Get editor instance
 const editor = editorManager.get();
 
-// 销毁编辑器
+// Destroy editor
 editorManager.destroy();
 ```
 
-#### 多实例模式
+#### Multi-Instance Mode
 
 ```typescript
 import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 
-// 创建或获取指定容器ID的实例
+// Create or get instance with specified container ID
 const manager1 = editorManagerFactory.create('editor-1');
 const manager2 = editorManagerFactory.create('editor-2');
 
-// 获取指定容器ID的实例
+// Get instance with specified container ID
 const manager = editorManagerFactory.get('editor-1');
 
-// 获取所有实例
+// Get all instances
 const allManagers = editorManagerFactory.getAll();
 
-// 销毁指定实例
+// Destroy specified instance
 editorManagerFactory.destroy('editor-1');
 
-// 销毁所有实例
+// Destroy all instances
 editorManagerFactory.destroyAll();
 ```
 
-#### 文档导出
+#### Document Export
 
-文档导出采用事件驱动机制，通过 EventBus 进行异步通信。
+Document export uses an event-driven mechanism with asynchronous communication through EventBus.
 
-**导出流程：**
+**Export Process:**
 
-1. **触发保存**: 调用 `editorManager.export()` 方法
-2. **等待事件**: 系统监听 `saveDocument` 事件
-3. **获取数据**: 事件触发后返回文档二进制数据
+1. **Trigger Save**: Call the `editorManager.export()` method
+2. **Wait for Event**: System listens for `saveDocument` event
+3. **Get Data**: Returns document binary data after event is triggered
 
-**代码示例：**
+**Code Example:**
 
 ```typescript
-// 单实例模式
+// Single-instance mode
 const editorManager = editorManagerFactory.getDefault();
 const result = await editorManager.export();
-// result 包含: { fileName, fileType, binData, instanceId, media }
+// result contains: { fileName, fileType, binData, instanceId, media }
 
-// 多实例模式
+// Multi-instance mode
 const manager1 = editorManagerFactory.get('editor-1');
 const result1 = await manager1.export();
-// result1.instanceId 会匹配 manager1.getInstanceId()
+// result1.instanceId will match manager1.getInstanceId()
 
-// 处理导出数据
+// Process export data
 const blob = new Blob([result.binData], {
   type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 });
 const url = window.URL.createObjectURL(blob);
-// 执行下载或其他操作
+// Perform download or other operations
 ```
 
-**多实例导出机制：**
+**Multi-Instance Export Mechanism:**
 
-在多实例模式下，每个 `EditorManager` 实例的 `export()` 方法会自动过滤 `SAVE_DOCUMENT` 事件，只接收属于当前实例的保存事件（通过 `instanceId` 字段匹配）。这确保了即使多个实例同时调用 `export()`，也不会出现事件混乱或数据错位的问题。
+In multi-instance mode, each `EditorManager` instance's `export()` method automatically filters `SAVE_DOCUMENT` events, only receiving save events belonging to the current instance (matched via `instanceId` field). This ensures that even when multiple instances call `export()` simultaneously, there will be no event confusion or data misalignment.
 
-#### 只读模式控制
+#### Read-Only Mode Control
 
 ```typescript
-// 设置为只读模式
+// Set to read-only mode
 await editorManager.setReadOnly(true);
 
-// 切换为可编辑模式
+// Switch to editable mode
 await editorManager.setReadOnly(false);
 
-// 查询当前模式
+// Query current mode
 const isReadOnly = editorManager.getReadOnly();
 ```
 
-### 事件总线 (EventBus)
+### Event Bus (EventBus)
 
-项目使用事件总线机制处理编辑器状态变化和文档操作事件。
+The project uses an event bus mechanism to handle editor state changes and document operation events.
 
-#### 支持的事件类型
+#### Supported Event Types
 
-- `saveDocument` - 文档保存完成事件
-- `documentReady` - 文档加载就绪事件
-- `loadingChange` - 加载状态变化事件
+- `saveDocument` - Document save completion event
+- `documentReady` - Document load ready event
+- `loadingChange` - Loading state change event
 
-#### 事件监听
+#### Event Listening
 
 ```typescript
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 import { ONLYOFFICE_EVENT_KEYS } from '@/onlyoffice-comp/lib/const';
 
-// 监听文档保存事件
+// Listen for document save event
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, (data) => {
-  console.log('文档已保存:', data);
+  console.log('Document saved:', data);
 });
 
-// 监听文档就绪事件
+// Listen for document ready event
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, (data) => {
-  console.log('文档已就绪:', data);
+  console.log('Document ready:', data);
 });
 
-// 移除事件监听
+// Remove event listener
 onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, callback);
 
-// 等待事件触发（返回 Promise）
+// Wait for event trigger (returns Promise)
 const saveData = await onlyofficeEventbus.waitFor(
   ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, 
-  3000 // 超时时间（毫秒）
+  3000 // Timeout (milliseconds)
 );
 ```
 
-### 文档转换 (X2T Converter)
+### Document Conversion (X2T Converter)
 
-文档转换功能基于 WebAssembly 实现，支持多种格式之间的相互转换。
+Document conversion functionality is implemented based on WebAssembly, supporting conversion between multiple formats.
 
 ```typescript
 import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
-// 单实例模式：创建编辑器视图（使用默认容器）
+// Single-instance mode: Create editor view (using default container)
 await createEditorView({
-  file: fileObject,        // File 对象（可选）
-  fileName: 'document.xlsx', // 文件名
-  isNew: false,            // 是否新建文档
-  readOnly: false,        // 是否只读
-  lang: 'zh',             // 界面语言
+  file: fileObject,        // File object (optional)
+  fileName: 'document.xlsx', // File name
+  isNew: false,            // Whether to create new document
+  readOnly: false,        // Whether read-only
+  lang: 'en',             // Interface language
 });
 
-// 多实例模式：创建编辑器视图（指定容器ID）
+// Multi-instance mode: Create editor view (specify container ID)
 const manager1 = await createEditorView({
   file: fileObject,
   fileName: 'document.xlsx',
   isNew: false,
   readOnly: false,
-  lang: 'zh',
-  containerId: 'editor-1', // 指定容器ID
+  lang: 'en',
+  containerId: 'editor-1', // Specify container ID
 });
 
-// 转换文档格式
+// Convert document format
 const result = await convertBinToDocument(
-  binData,      // 二进制数据
-  fileName,      // 文件名
-  FILE_TYPE.XLSX, // 目标格式
-  media         // 媒体文件（可选）
+  binData,      // Binary data
+  fileName,      // File name
+  FILE_TYPE.XLSX, // Target format
+  media         // Media files (optional)
 );
 ```
 
-### 数据类型定义
+### Data Type Definitions
 
 ```typescript
-// 文档保存数据
+// Document save data
 type SaveDocumentData = {
-  fileName: string;      // 文件名
-  fileType: string;      // 文件类型（如 'xlsx', 'docx'）
-  binData: Uint8Array;   // 二进制数据
-  instanceId: string;    // 实例ID（多实例模式下用于事件匹配）
-  media?: Record<string, string>; // 媒体文件映射
+  fileName: string;      // File name
+  fileType: string;      // File type (e.g., 'xlsx', 'docx')
+  binData: Uint8Array;   // Binary data
+  instanceId: string;    // Instance ID (used for event matching in multi-instance mode)
+  media?: Record<string, string>; // Media file mapping
 }
 
-// 文档就绪数据
+// Document ready data
 type DocumentReadyData = {
-  fileName: string;      // 文件名
-  fileType: string;      // 文件类型
+  fileName: string;      // File name
+  fileType: string;      // File type
 }
 ```
 
-## 🏗️ 技术实现
+## 🏗️ Technical Implementation
 
-- **OnlyOffice SDK**: 集成 OnlyOffice 官方 JavaScript SDK，提供文档编辑核心能力
-- **WebAssembly**: 利用 x2t-wasm 模块实现文档格式转换功能
-- **客户端架构**: 所有功能模块均在浏览器环境中运行，不依赖服务端
+- **OnlyOffice SDK**: Integrates OnlyOffice official JavaScript SDK, providing core document editing capabilities
+- **WebAssembly**: Uses x2t-wasm module to implement document format conversion functionality
+- **Client-Side Architecture**: All functional modules run in the browser environment without server dependencies
 
-## 🚀 部署方案
+## 🚀 Deployment Options
 
-### Vercel 部署
+### Vercel Deployment
 
-项目已配置静态导出，可直接部署到 Vercel：
+The project is configured for static export and can be deployed directly to Vercel:
 
 ```bash
-# 安装依赖
+# Install dependencies
 npm install
-# 或
+# or
 pnpm install
 
-# 构建项目
+# Build project
 npm run build
 
-# Vercel 会自动检测并部署
+# Vercel will automatically detect and deploy
 ```
 
-访问地址：https://mvp-onlyoffice.vercel.app/
+Access URL: https://mvp-onlyoffice.vercel.app/
 
-### 静态文件部署
+### Static File Deployment
 
-项目支持静态导出，构建后的文件可部署到任何静态托管服务：
+The project supports static export, and built files can be deployed to any static hosting service:
 
 ```bash
-# 构建静态文件
+# Build static files
 npm run build
 
-# 输出目录: out/
-# 可直接部署到 GitHub Pages、Netlify、Nginx 等
+# Output directory: out/
+# Can be directly deployed to GitHub Pages, Netlify, Nginx, etc.
 ```
 
-### 本地开发
+### Local Development
 
 ```bash
-# 克隆仓库
+# Clone repository
 git clone <repository-url>
 cd mvp-onlyoffice
 
-# 安装依赖
+# Install dependencies
 npm install
-# 或
+# or
 pnpm install
 
-# 启动开发服务器
+# Start development server
 npm run dev
 
-# 访问 http://localhost:3001
+# Access http://localhost:3001
 ```
 
-## 📝 项目结构
+## 📝 Project Structure
 
 ```
 mvp-onlyoffice/
 ├── src/
-│   ├── app/              # Next.js 应用页面
+│   ├── app/              # Next.js application pages
 │   │   ├── excel/
-│   │   │   └── base/     # Excel 编辑器页面 (/excel/base)
+│   │   │   └── base/     # Excel editor page (/excel/base)
 │   │   ├── docs/
-│   │   │   └── base/     # Word 编辑器页面 (/docs/base)
+│   │   │   └── base/     # Word editor page (/docs/base)
 │   │   ├── ppt/
-│   │   │   └── base/     # PowerPoint 编辑器页面 (/ppt/base)
+│   │   │   └── base/     # PowerPoint editor page (/ppt/base)
 │   │   ├── multi/
-│   │   │   ├── base/     # 多实例基础演示页面 (/multi/base)
-│   │   │   └── tabs/     # 多实例 Tab 演示页面 (/multi/tabs)
-│   │   └── page.tsx      # 首页（重定向到 /excel/base）
-│   ├── onlyoffice-comp/  # OnlyOffice 组件库
+│   │   │   ├── base/     # Multi-instance basic demo page (/multi/base)
+│   │   │   └── tabs/     # Multi-instance Tab demo page (/multi/tabs)
+│   │   └── page.tsx      # Home page (redirects to /excel/base)
+│   ├── onlyoffice-comp/  # OnlyOffice component library
 │   │   └── lib/
-│   │       ├── editor-manager.ts  # 编辑器管理器（支持多实例）
-│   │       ├── x2t.ts             # 文档转换模块
-│   │       ├── eventbus.ts        # 事件总线
+│   │       ├── editor-manager.ts  # Editor manager (supports multi-instance)
+│   │       ├── x2t.ts             # Document conversion module
+│   │       ├── eventbus.ts        # Event bus
 │   │       └── ...
-│   └── components/       # 通用组件
-├── public/               # 静态资源
-│   ├── web-apps/         # OnlyOffice Web 应用资源
-│   ├── sdkjs/            # OnlyOffice SDK 资源
-│   └── wasm/             # WebAssembly 转换器
-└── onlyoffice-x2t-wasm/  # x2t-wasm 源码
+│   └── components/       # Common components
+├── public/               # Static resources
+│   ├── web-apps/         # OnlyOffice Web application resources
+│   ├── sdkjs/            # OnlyOffice SDK resources
+│   └── wasm/             # WebAssembly converter
+└── onlyoffice-x2t-wasm/  # x2t-wasm source code
 ```
 
-### 页面路由说明
+### Page Route Description
 
-- `/` - 首页，自动重定向到 `/excel/base`
-- `/excel/base` - Excel 电子表格编辑器（单实例模式）
-- `/docs/base` - Word 文档编辑器（单实例模式）
-- `/ppt/base` - PowerPoint 演示文稿编辑器（单实例模式）
-- `/multi/base` - 多实例基础演示，展示同时运行多个独立编辑器实例
-- `/multi/tabs` - 多实例 Tab 演示，展示带 LRU 缓存管理的多 Tab 编辑器实现
+- `/` - Home page, automatically redirects to `/excel/base`
+- `/excel/base` - Excel spreadsheet editor (single-instance mode)
+- `/docs/base` - Word document editor (single-instance mode)
+- `/ppt/base` - PowerPoint presentation editor (single-instance mode)
+- `/multi/base` - Multi-instance basic demo, showcasing multiple independent editor instances running simultaneously
+- `/multi/tabs` - Multi-instance Tab demo, showcasing multi-tab editor implementation with LRU cache management
 
-## 🔤 字体配置
+## 🔤 Font Configuration
 
-### 字体文件说明
+### Font File Description
 
-本项目遵循开源许可要求，**不包含**受版权保护的商业字体文件（如 Arial、Times New Roman、微软雅黑、宋体等）。这些字体名称仍保留在配置中以确保文档兼容性，但实际字体文件需用户自行添加。
+This project complies with open-source licensing requirements and **does not include** copyrighted commercial font files (such as Arial, Times New Roman, Microsoft YaHei, SimSun, etc.). These font names are still retained in the configuration to ensure document compatibility, but actual font files need to be added by users.
 
-### 添加字体文件
+### Adding Font Files
 
-如需添加字体，请按以下步骤操作：
+To add fonts, follow these steps:
 
-1. 查看 `public/sdkjs/common/AllFonts.js` 文件
-2. 在 `__fonts_files` 数组中查找目标字体的索引号
-3. 将字体文件放置到 `public/fonts/` 目录
-4. 将文件重命名为对应的索引号（无需扩展名）
+1. Check the `public/sdkjs/common/AllFonts.js` file
+2. Find the target font's index number in the `__fonts_files` array
+3. Place the font file in the `public/fonts/` directory
+4. Rename the file to the corresponding index number (no extension needed)
 
-**示例：添加 Arial 字体**
+**Example: Adding Arial Font**
 
-- Arial 常规字体索引为 `223` → 放置文件为 `public/fonts/223`
-- Arial 粗体索引为 `226` → 放置文件为 `public/fonts/226`
-- Arial 斜体索引为 `224` → 放置文件为 `public/fonts/224`
-- Arial 粗斜体索引为 `225` → 放置文件为 `public/fonts/225`
+- Arial regular font index is `223` → Place file as `public/fonts/223`
+- Arial bold index is `226` → Place file as `public/fonts/226`
+- Arial italic index is `224` → Place file as `public/fonts/224`
+- Arial bold italic index is `225` → Place file as `public/fonts/225`
 
-**重要提示**: 请确保使用的字体文件符合相关许可协议，仅使用开源字体或已获得授权的字体。
+**Important Note**: Please ensure that the font files used comply with relevant licensing agreements, only use open-source fonts or fonts with proper authorization.
 
-## 📚 相关资源
+## 📚 Related Resources
 
-- [OnlyOffice API 文档](https://api.onlyoffice.com/zh-CN/docs/docs-api/usage-api/config/document/) - OnlyOffice 官方 API 参考
-- [ranuts/document](https://github.com/ranuts/document) - 参考静态资源实现
-- [OnlyOffice Web Apps](https://github.com/ONLYOFFICE/web-apps) - OnlyOffice 网页应用源码
+- [OnlyOffice API Documentation](https://api.onlyoffice.com/zh-CN/docs/docs-api/usage-api/config/document/) - OnlyOffice official API reference
+- [ranuts/document](https://github.com/ranuts/document) - Reference static resource implementation
+- [OnlyOffice Web Apps](https://github.com/ONLYOFFICE/web-apps) - OnlyOffice web application source code
 - [OnlyOffice SDK](https://github.com/ONLYOFFICE/sdkjs) - OnlyOffice JavaScript SDK
-- [x2t-wasm](https://github.com/cryptpad/onlyoffice-x2t-wasm) - WebAssembly 文档转换器
+- [x2t-wasm](https://github.com/cryptpad/onlyoffice-x2t-wasm) - WebAssembly document converter
 
-## 🤝 参与贡献
+## 🤝 Contributing
 
-欢迎提交 Issue 和 Pull Request 来帮助改进项目！
+Welcome to submit Issues and Pull Requests to help improve the project!
 
-## 📄 开源许可
+## 📄 Open Source License
 
-项目采用开源许可证，详情请查看 [LICENSE](LICENSE) 文件。
+The project uses an open-source license. For details, please see the [LICENSE](LICENSE) file.
 
-## 📌 注意事项
+## 📌 Notes
 
+### Browser Compatibility
 
-### 浏览器兼容性
-
-建议使用现代浏览器（Chrome、Firefox、Edge、Safari 最新版本）以获得最佳体验。
+It is recommended to use modern browsers (latest versions of Chrome, Firefox, Edge, Safari) for the best experience.
