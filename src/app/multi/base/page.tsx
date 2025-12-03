@@ -301,26 +301,26 @@ function MultiInstancePageContent() {
     const containerId = `editor-${editorKey.replace('manager', '')}`;
 
     return (
-      <div className="flex flex-col h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <div className="flex flex-col h-full min-h-[400px] md:min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white">
         {/* 控制栏 */}
-        <div className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 mr-auto">
-            <div className="w-6 h-6 bg-gradient-to-br rounded flex items-center justify-center text-xs font-bold">
+        <div className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-200 px-2 py-2 md:px-4 md:py-3 flex items-center gap-2 md:gap-3 flex-wrap flex-shrink-0">
+          <div className="flex items-center gap-1 md:gap-2 mr-auto">
+            <div className="w-5 h-5 md:w-6 md:h-6 bg-gradient-to-br rounded flex items-center justify-center text-xs font-bold">
               {editorKey.replace('manager', '')}
             </div>
-            <h2 className="text-sm font-semibold text-gray-900">{editorName}</h2>
+            <h2 className="text-xs md:text-sm font-semibold text-gray-900">{editorName}</h2>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1 md:gap-2 flex-wrap">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+              className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
             >
               上传
             </button>
             <button
               onClick={() => handleView(editorKey, `New_Document.${defaultFileType.toLowerCase()}`)}
-              className="px-3 py-1.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors"
+              className="px-2 py-1 md:px-3 md:py-1.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors"
             >
               新建
             </button>
@@ -328,19 +328,19 @@ function MultiInstancePageContent() {
               <>
                 <button
                   onClick={() => handleExport(manager)}
-                  className="px-3 py-1.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors"
+                  className="px-2 py-1 md:px-3 md:py-1.5 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors"
                 >
-                  💾 导出
+                  💾
                 </button>
                 <button
                   onClick={() => handleToggleReadOnly(editorNum)}
-                  className={`px-3 py-1.5 rounded text-xs transition-colors ${
+                  className={`px-2 py-1 md:px-3 md:py-1.5 rounded text-xs transition-colors ${
                     readOnly
                       ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                       : 'bg-white border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  {readOnly ? '🔒 只读' : '✏️ 编辑'}
+                  {readOnly ? '🔒' : '✏️'}
                 </button>
               </>
             )}
@@ -348,7 +348,7 @@ function MultiInstancePageContent() {
         </div>
 
         {/* 编辑器容器 */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-h-[350px] md:min-h-0">
           <div className="onlyoffice-container absolute inset-0" data-onlyoffice-container-id={containerId}>
             <div id={containerId} className="absolute inset-0" />
           </div>
@@ -373,24 +373,24 @@ function MultiInstancePageContent() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-screen md:min-h-0">
       {/* 顶部控制栏 */}
-      <div className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-200 shadow-sm">
-        <div className="max-w-full mx-auto px-5 py-4 flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-3 mr-auto">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center text-white font-bold">
+      <div className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-200 shadow-sm flex-shrink-0">
+        <div className="max-w-full mx-auto px-3 py-2 md:px-5 md:py-4 flex items-center gap-2 md:gap-4 flex-wrap">
+          <div className="flex items-center gap-2 md:gap-3 mr-auto">
+            <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center text-white font-bold text-xs md:text-base">
               M
             </div>
-            <h1 className="text-lg font-semibold text-gray-900">muli instance编辑器演示</h1>
+            <h1 className="text-sm md:text-lg font-semibold text-gray-900">muli instance编辑器演示</h1>
           </div>
 
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 md:gap-3 flex-wrap">
             <button
               onClick={handleLanguageSwitch}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+              className="px-2 py-1 md:px-3 md:py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-xs md:text-sm font-medium"
               title={currentLang === ONLYOFFICE_LANG_KEY.ZH ? 'Switch to English' : '切换到中文'}
             >
-              {currentLang === ONLYOFFICE_LANG_KEY.ZH ? '点击切换EN' : '点击切换中文'}
+              {currentLang === ONLYOFFICE_LANG_KEY.ZH ? 'EN' : '中文'}
             </button>
             <button
               onClick={() => {
@@ -399,9 +399,9 @@ function MultiInstancePageContent() {
                 setEditorDocuments({ manager1: null, manager2: null, manager3: null });
                 forceUpdate((prev) => prev + 1);
               }}
-              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm"
+              className="px-2 py-1 md:px-4 md:py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs md:text-sm"
             >
-              清空所有
+              清空
             </button>
           </div>
         </div>
@@ -409,14 +409,14 @@ function MultiInstancePageContent() {
 
       {/* 错误提示 */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mx-4 mt-4 rounded">
-          <p className="font-medium">错误：{error}</p>
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 md:p-4 mx-2 md:mx-4 mt-2 md:mt-4 rounded flex-shrink-0">
+          <p className="font-medium text-sm md:text-base">错误：{error}</p>
         </div>
       )}
 
       {/* 多编辑器网格布局 */}
-      <div className="flex-1 p-4 overflow-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+      <div className="flex-1 min-h-0 p-2 md:p-4 overflow-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4 h-full min-h-[500px] md:min-h-0">
           {renderEditorPanel('manager1', 'Word 编辑器', fileInputRef1, FILE_TYPE.DOCX, '.docx,.doc')}
           {renderEditorPanel('manager2', 'Excel 编辑器', fileInputRef2, FILE_TYPE.XLSX, '.xlsx,.xls,.csv')}
           {renderEditorPanel('manager3', 'PowerPoint 编辑器', fileInputRef3, FILE_TYPE.PPTX, '.pptx,.ppt')}
