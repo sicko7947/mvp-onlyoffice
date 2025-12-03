@@ -1,44 +1,44 @@
-# OnlyOffice Comp Documentation
+# OnlyOffice Comp 使用文档
 
-> 📖 English | [中文](readme.md)
+> 📖 [English](readme.md) | 中文
 
-OnlyOffice Comp is a document editor component library based on OnlyOffice, supporting online editing, viewing, and conversion of Word, Excel, PowerPoint, and other documents.
+OnlyOffice Comp 是一个基于 OnlyOffice 的文档编辑器组件库，支持 Word、Excel、PowerPoint 等文档的在线编辑、查看和转换功能。
 
-## Table of Contents
+## 目录
 
-- [Quick Start](#quick-start)
-- [Core API](#core-api)
-- [Event System](#event-system)
-- [Complete Examples](#complete-examples)
-- [API Reference](#api-reference)
+- [快速开始](#快速开始)
+- [核心 API](#核心-api)
+- [事件系统](#事件系统)
+- [完整示例](#完整示例)
+- [API 参考](#api-参考)
 
-## Quick Start
+## 快速开始
 
-### 1. Initialize Editor
+### 1. 初始化编辑器
 
-Before using the editor, you need to initialize the OnlyOffice environment:
+在使用编辑器之前，需要先初始化 OnlyOffice 环境：
 
 ```typescript
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
 
-// Initialize OnlyOffice (only needs to be called once, automatically cached)
+// 初始化 OnlyOffice（只需调用一次，会自动缓存）
 await initializeOnlyOffice();
 ```
 
-### 2. Create Editor View
+### 2. 创建编辑器视图
 
-There are two ways to create an editor view: create a new document or open an existing document. Supports both single-instance and multi-instance modes.
+创建编辑器视图有两种方式：新建文档或打开现有文档。支持单实例和多实例两种模式。
 
 ```typescript
 import { createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
-// Single-instance mode: Create new document (using default container)
+// 单实例模式：新建文档（使用默认容器）
 await createEditorView({
   isNew: true,
   fileName: 'New_Document.docx',
 });
 
-// Single-instance mode: Open existing document
+// 单实例模式：打开现有文档
 const file = new File([...], 'document.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 await createEditorView({
   isNew: false,
@@ -46,25 +46,25 @@ await createEditorView({
   file: file,
 });
 
-// Multi-instance mode: Specify container ID
+// 多实例模式：指定容器ID
 const manager1 = await createEditorView({
   isNew: true,
   fileName: 'Doc1.docx',
-  containerId: 'editor-1', // Specify container ID
+  containerId: 'editor-1', // 指定容器ID
 });
 
 const manager2 = await createEditorView({
   isNew: true,
   fileName: 'Doc2.xlsx',
-  containerId: 'editor-2', // Different container ID
+  containerId: 'editor-2', // 不同的容器ID
 });
 ```
 
-### 3. Add Editor Container
+### 3. 添加编辑器容器
 
-Add editor container in React component:
+在 React 组件中添加编辑器容器：
 
-**Single-Instance Mode:**
+**单实例模式：**
 ```tsx
 import { ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 
@@ -77,22 +77,22 @@ export default function EditorPage() {
 }
 ```
 
-**Multi-Instance Mode:**
+**多实例模式：**
 ```tsx
 export default function MultiEditorPage() {
   return (
     <div className="grid grid-cols-3 gap-4">
-      {/* First editor container */}
+      {/* 第一个编辑器容器 */}
       <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-1">
         <div id="editor-1" className="absolute inset-0" />
       </div>
       
-      {/* Second editor container */}
+      {/* 第二个编辑器容器 */}
       <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-2">
         <div id="editor-2" className="absolute inset-0" />
       </div>
       
-      {/* Third editor container */}
+      {/* 第三个编辑器容器 */}
       <div className="onlyoffice-container relative" data-onlyoffice-container-id="editor-3">
         <div id="editor-3" className="absolute inset-0" />
       </div>
@@ -101,13 +101,13 @@ export default function MultiEditorPage() {
 }
 ```
 
-**Note**: In multi-instance mode, you must use the `data-onlyoffice-container-id` attribute to precisely locate containers and avoid routing operations like image uploads to the wrong instance.
+**注意**：多实例模式下，必须使用 `data-onlyoffice-container-id` 属性来精确定位容器，避免图片上传等操作路由到错误的实例。
 
-## Core API
+## 核心 API
 
 ### `initializeOnlyOffice()`
 
-Initialize the OnlyOffice editor environment, including loading scripts, API, and X2T converter.
+初始化 OnlyOffice 编辑器环境，包括加载脚本、API 和 X2T 转换器。
 
 ```typescript
 import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
@@ -115,157 +115,157 @@ import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
 await initializeOnlyOffice();
 ```
 
-**Features:**
-- Uses singleton pattern, multiple calls will only initialize once
-- Automatically loads all required resources
-- Returns Promise, supports async/await
+**特点：**
+- 使用单例模式，多次调用只会初始化一次
+- 自动加载所有必需的资源
+- 返回 Promise，支持异步等待
 
 ### `createEditorView(options)`
 
-Create editor view, supports creating new or opening documents. Supports both single-instance and multi-instance modes.
+创建编辑器视图，支持新建或打开文档。支持单实例和多实例两种模式。
 
 ```typescript
 import { createEditorView } from '@/onlyoffice-comp/lib/x2t';
 
 await createEditorView({
-  isNew: boolean;           // Whether to create new document
-  fileName: string;         // File name (with extension)
-  file?: File;             // File object (required when opening existing document)
-  readOnly?: boolean;       // Whether read-only mode, defaults to false
-  lang?: string;           // Interface language, defaults to 'en'
-  containerId?: string;    // Container ID (required for multi-instance mode, optional for single-instance mode)
-  editorManager?: EditorManager; // Editor manager instance (optional)
+  isNew: boolean;           // 是否新建文档
+  fileName: string;         // 文件名（包含扩展名）
+  file?: File;             // 文件对象（打开现有文档时必需）
+  readOnly?: boolean;       // 是否只读模式，默认为 false
+  lang?: string;           // 界面语言，默认为 'en'
+  containerId?: string;    // 容器ID（多实例模式必需，单实例模式可选）
+  editorManager?: EditorManager; // 编辑器管理器实例（可选）
 });
 ```
 
-**Return Value:** `Promise<EditorManager>` - Returns editor manager instance
+**返回值：** `Promise<EditorManager>` - 返回编辑器管理器实例
 
-**Single-Instance Mode:**
+**单实例模式：**
 ```typescript
-// Don't specify containerId, use default container
+// 不指定 containerId，使用默认容器
 await createEditorView({
   isNew: true,
   fileName: 'document.docx',
 });
 ```
 
-**Multi-Instance Mode:**
+**多实例模式：**
 ```typescript
-// Specify containerId, create independent instance
+// 指定 containerId，创建独立实例
 const manager = await createEditorView({
   isNew: true,
   fileName: 'document.docx',
-  containerId: 'editor-1', // Must specify unique container ID
+  containerId: 'editor-1', // 必须指定唯一的容器ID
 });
 ```
 
-**Supported File Types:**
+**支持的文件类型：**
 - Word: `.docx`, `.doc`, `.odt`, `.rtf`, `.txt`
 - Excel: `.xlsx`, `.xls`, `.ods`, `.csv`
 - PowerPoint: `.pptx`, `.ppt`, `.odp`
 
-### `editorManagerFactory` and `EditorManager`
+### `editorManagerFactory` 和 `EditorManager`
 
-Editor manager factory and editor manager, providing editor operation and control functions.
+编辑器管理器工厂和编辑器管理器，提供编辑器的操作和控制功能。
 
-#### Single-Instance Mode (Backward Compatible)
+#### 单实例模式（向后兼容）
 
 ```typescript
 import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 
-// Get default instance
+// 获取默认实例
 const editorManager = editorManagerFactory.getDefault();
 
-// Check if editor exists
+// 检查编辑器是否存在
 if (editorManager.exists()) {
-  // Editor has been created
+  // 编辑器已创建
 }
 
-// Export document
+// 导出文档
 const binData = await editorManager.export();
 // binData: { fileName: string, fileType: string, binData: Uint8Array, media?: Record<string, string> }
 
-// Set read-only mode
-await editorManager.setReadOnly(true);  // Set to read-only
-await editorManager.setReadOnly(false); // Set to editable
+// 设置只读模式
+await editorManager.setReadOnly(true);  // 设置为只读
+await editorManager.setReadOnly(false); // 设置为可编辑
 
-// Get current read-only state
+// 获取当前只读状态
 const isReadOnly = editorManager.getReadOnly();
 
-// Destroy editor instance
+// 销毁编辑器实例
 editorManager.destroy();
 ```
 
-#### Multi-Instance Mode
+#### 多实例模式
 
 ```typescript
 import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 
-// Create or get instance with specified container ID
+// 创建或获取指定容器ID的实例
 const manager1 = editorManagerFactory.create('editor-1');
 const manager2 = editorManagerFactory.create('editor-2');
 
-// Get instance with specified container ID
+// 获取指定容器ID的实例
 const manager = editorManagerFactory.get('editor-1');
 
-// Get all instances
+// 获取所有实例
 const allManagers = editorManagerFactory.getAll();
 
-// Destroy specified instance
+// 销毁指定实例
 editorManagerFactory.destroy('editor-1');
 
-// Destroy all instances
+// 销毁所有实例
 editorManagerFactory.destroyAll();
 ```
 
-#### `EditorManager` Instance Methods
+#### `EditorManager` 实例方法
 
-Each `EditorManager` instance provides the following methods:
+每个 `EditorManager` 实例都提供以下方法：
 
-**`exists()`** - Check if editor exists
+**`exists()`** - 检查编辑器是否存在
 ```typescript
 if (manager.exists()) {
-  // Editor has been created
+  // 编辑器已创建
 }
 ```
 
-**`export()`** - Export document
+**`export()`** - 导出文档
 ```typescript
 const binData = await manager.export();
 // binData: { fileName: string, fileType: string, binData: Uint8Array, instanceId: string, media?: Record<string, string> }
 ```
 
-**Note**: In multi-instance mode, the `export()` method automatically filters events, only receiving save events belonging to the current instance (matched via `instanceId`), ensuring that export data from other instances is not received.
+**注意**：在多实例模式下，`export()` 方法会自动过滤事件，只接收属于当前实例的保存事件（通过 `instanceId` 匹配），确保不会接收到其他实例的导出数据。
 
-**`setReadOnly(readOnly)`** - Set read-only mode
+**`setReadOnly(readOnly)`** - 设置只读模式
 ```typescript
-await manager.setReadOnly(true);  // Set to read-only
-await manager.setReadOnly(false); // Set to editable
+await manager.setReadOnly(true);  // 设置为只读
+await manager.setReadOnly(false); // 设置为可编辑
 ```
 
-**`getReadOnly()`** - Get current read-only state
+**`getReadOnly()`** - 获取当前只读状态
 ```typescript
 const isReadOnly = manager.getReadOnly();
 ```
 
-**`getInstanceId()`** - Get unique ID of the instance
+**`getInstanceId()`** - 获取实例的唯一ID
 ```typescript
 const instanceId = manager.getInstanceId();
 ```
 
-**`getContainerId()`** - Get container ID
+**`getContainerId()`** - 获取容器的ID
 ```typescript
 const containerId = manager.getContainerId();
 ```
 
-**`destroy()`** - Destroy editor instance
+**`destroy()`** - 销毁编辑器实例
 ```typescript
 manager.destroy();
 ```
 
 ### `convertBinToDocument()`
 
-Convert binary data to document in specified format.
+将二进制数据转换为指定格式的文档。
 
 ```typescript
 import { convertBinToDocument } from '@/onlyoffice-comp/lib/x2t';
@@ -280,70 +280,70 @@ const result = await convertBinToDocument(
 // result: { fileName: string, data: Uint8Array }
 ```
 
-**Supported File Types:**
-- `FILE_TYPE.DOCX` - Word document
-- `FILE_TYPE.XLSX` - Excel spreadsheet
-- `FILE_TYPE.PPTX` - PowerPoint presentation
+**支持的文件类型：**
+- `FILE_TYPE.DOCX` - Word 文档
+- `FILE_TYPE.XLSX` - Excel 表格
+- `FILE_TYPE.PPTX` - PowerPoint 演示文稿
 
-## Event System
+## 事件系统
 
-OnlyOffice Comp uses EventBus mechanism for event communication.
+OnlyOffice Comp 使用 EventBus 机制进行事件通信。
 
-### Event Types
+### 事件类型
 
 ```typescript
 import { ONLYOFFICE_EVENT_KEYS } from '@/onlyoffice-comp/lib/const';
 
-ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT   // 'saveDocument' - Document save event
-ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY  // 'documentReady' - Document ready event
-ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE  // 'loadingChange' - Loading state change event
+ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT   // 'saveDocument' - 文档保存事件
+ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY  // 'documentReady' - 文档准备就绪事件
+ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE  // 'loadingChange' - Loading 状态变化事件
 ```
 
-### Listening to Events
+### 监听事件
 
 ```typescript
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 import { ONLYOFFICE_EVENT_KEYS } from '@/onlyoffice-comp/lib/const';
 
-// Listen for document ready event
+// 监听文档准备就绪事件
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, (data) => {
-  console.log('Document ready:', data.fileName);
+  console.log('文档已准备就绪:', data.fileName);
   // data: { fileName: string, fileType: string }
 });
 
-// Listen for document save event
+// 监听文档保存事件
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, (data) => {
-  console.log('Document saved:', data.fileName);
+  console.log('文档已保存:', data.fileName);
   // data: { fileName: string, fileType: string, binData: Uint8Array, instanceId: string, media?: Record<string, string> }
   
-  // In multi-instance mode, you can determine which instance's save event it is via instanceId
+  // 多实例模式下，可以通过 instanceId 判断是哪个实例的保存事件
   if (data.instanceId === manager.getInstanceId()) {
-    // This is the current instance's save event
+    // 这是当前实例的保存事件
   }
 });
 
-// Listen for Loading state change event (for export and other operations)
+// 监听 Loading 状态变化事件（用于导出等操作）
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, (data) => {
   setLoading(data.loading);
   // data: { loading: boolean }
 });
 ```
 
-### Waiting for Events
+### 等待事件
 
-Use the `waitFor` method to wait for event trigger, returns Promise:
+使用 `waitFor` 方法等待事件触发，返回 Promise：
 
 ```typescript
-// Wait for document ready (30 second timeout)
+// 等待文档准备就绪（30秒超时）
 const readyData = await onlyofficeEventbus.waitFor(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, 30000);
 
-// Wait for document save (3 second timeout)
+// 等待文档保存（3秒超时）
 const saveData = await onlyofficeEventbus.waitFor(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, 3000);
 ```
 
-### Loading State Management
+### Loading 状态管理
 
-The `LOADING_CHANGE` event is automatically triggered during operations like document export, used to display loading state:
+`LOADING_CHANGE` 事件会在导出文档等操作时自动触发，用于显示加载状态：
 
 ```typescript
 import { useEffect, useState } from 'react';
@@ -354,7 +354,7 @@ function EditorPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Listen for loading state changes
+    // 监听 loading 状态变化
     const handleLoadingChange = (data: { loading: boolean }) => {
       setLoading(data.loading);
     };
@@ -362,7 +362,7 @@ function EditorPage() {
     onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
 
     return () => {
-      // Clean up listener
+      // 清理监听器
       onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
     };
   }, []);
@@ -370,19 +370,19 @@ function EditorPage() {
   return (
     <div>
       {loading && <Loading />}
-      {/* Editor content */}
+      {/* 编辑器内容 */}
     </div>
   );
 }
 ```
 
-**Note:** The `editorManager.export()` method automatically triggers the `LOADING_CHANGE` event, no need to manually manage loading state.
+**注意：** `editorManager.export()` 方法会自动触发 `LOADING_CHANGE` 事件，无需手动管理 loading 状态。
 
-### Remove Listeners
+### 取消监听
 
 ```typescript
 const handler = (data) => {
-  console.log('Event triggered:', data);
+  console.log('事件触发:', data);
 };
 
 onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, handler);
@@ -390,9 +390,9 @@ onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, handler);
 onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, handler);
 ```
 
-## Complete Examples
+## 完整示例
 
-### React Component Example
+### React 组件示例
 
 ```tsx
 'use client';
@@ -405,7 +405,7 @@ import { editorManagerFactory } from '@/onlyoffice-comp/lib/editor-manager';
 import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID } from '@/onlyoffice-comp/lib/const';
 import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 
-// Get default instance (backward compatible)
+// 获取默认实例（向后兼容）
 const editorManager = editorManagerFactory.getDefault();
 
 export default function EditorPage() {
@@ -414,7 +414,7 @@ export default function EditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
 
-  // Create or open document
+  // 创建或打开文档
   const handleView = async (fileName: string, file?: File) => {
     setLoading(true);
     setError(null);
@@ -428,13 +428,13 @@ export default function EditorPage() {
         isNew: !currentFile,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Operation failed');
+      setError(err instanceof Error ? err.message : '操作失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // Export document
+  // 导出文档
   const handleExport = async () => {
     try {
       const binData = await editorManager.export();
@@ -444,7 +444,7 @@ export default function EditorPage() {
         FILE_TYPE.DOCX
       );
       
-      // Download file
+      // 下载文件
       const blob = new Blob([result.data], {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
@@ -455,7 +455,7 @@ export default function EditorPage() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error('导出失败:', err);
     }
   };
 
@@ -465,18 +465,18 @@ export default function EditorPage() {
         await initializeOnlyOffice();
         await handleView('New_Document.docx');
       } catch (err) {
-        setError('Unable to load editor component');
+        setError('无法加载编辑器组件');
       }
     };
 
     init();
 
-    // Listen for document ready event
+    // 监听文档准备就绪事件
     onlyofficeEventbus.on(ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY, (data) => {
-      console.log('Document ready:', data);
+      console.log('文档已准备就绪:', data);
     });
 
-    // Listen for loading state changes
+    // 监听 loading 状态变化
     const handleLoadingChange = (data: { loading: boolean }) => {
       setLoading(data.loading);
     };
@@ -485,13 +485,13 @@ export default function EditorPage() {
     return () => {
       onlyofficeEventbus.off(ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE, handleLoadingChange);
       editorManager.destroy();
-      // Or destroy all instances: editorManagerFactory.destroyAll();
+      // 或者销毁所有实例：editorManagerFactory.destroyAll();
     };
   }, []);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Control bar */}
+      {/* 控制栏 */}
       <div className="bg-gradient-to-r from-white to-gray-50 border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-5 py-4 flex items-center gap-4">
           <div className="flex gap-3">
@@ -499,13 +499,13 @@ export default function EditorPage() {
               onClick={() => fileInputRef.current?.click()}
               className="px-4 py-2 bg-blue-500 text-white rounded-md"
             >
-              Upload Document
+              上传文档
             </button>
             <button
               onClick={() => handleView('New_Document.docx')}
               className="px-4 py-2 bg-white border border-gray-300 rounded-md"
             >
-              New Document
+              新建文档
             </button>
             {editorManager.exists() && (
               <>
@@ -513,7 +513,7 @@ export default function EditorPage() {
                   onClick={handleExport}
                   className="px-4 py-2 bg-white border border-gray-300 rounded-md"
                 >
-                  💾 Export
+                  💾 导出
                 </button>
                 <button
                   onClick={async () => {
@@ -523,7 +523,7 @@ export default function EditorPage() {
                   }}
                   className="px-4 py-2 bg-white border border-gray-300 rounded-md"
                 >
-                  {readOnly ? '🔒 Read-Only' : '✏️ Edit'}
+                  {readOnly ? '🔒 只读' : '✏️ 编辑'}
                 </button>
               </>
             )}
@@ -531,21 +531,21 @@ export default function EditorPage() {
         </div>
       </div>
 
-      {/* Error message */}
+      {/* 错误提示 */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4">
           <p>{error}</p>
         </div>
       )}
 
-      {/* Editor container */}
+      {/* 编辑器容器 */}
       <div className={
         `${ONLYOFFICE_CONTAINER_CONFIG.PARENT_ID} flex-1 relative`
       }>
         <div id={ONLYOFFICE_ID} className="absolute inset-0" />
       </div>
 
-      {/* File input */}
+      {/* 文件输入 */}
       <input
         ref={fileInputRef}
         type="file"
@@ -564,26 +564,26 @@ export default function EditorPage() {
 }
 ```
 
-## API Reference
+## API 参考
 
-### Constants
+### 常量
 
 #### `ONLYOFFICE_ID`
-Editor container DOM ID, defaults to `'iframe2'`
+编辑器容器的 DOM ID，默认为 `'iframe2'`
 
 #### `ONLYOFFICE_EVENT_KEYS`
-Event name constants:
-- `ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT` - Document save event
-- `ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY` - Document ready event
-- `ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE` - Loading state change event
+事件名称常量：
+- `ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT` - 文档保存事件
+- `ONLYOFFICE_EVENT_KEYS.DOCUMENT_READY` - 文档准备就绪事件
+- `ONLYOFFICE_EVENT_KEYS.LOADING_CHANGE` - Loading 状态变化事件
 
 #### `FILE_TYPE`
-File type constants:
-- `FILE_TYPE.DOCX` - Word document
-- `FILE_TYPE.XLSX` - Excel spreadsheet
-- `FILE_TYPE.PPTX` - PowerPoint presentation
+文件类型常量：
+- `FILE_TYPE.DOCX` - Word 文档
+- `FILE_TYPE.XLSX` - Excel 表格
+- `FILE_TYPE.PPTX` - PowerPoint 演示文稿
 
-### Type Definitions
+### 类型定义
 
 #### `DocumentReadyData`
 ```typescript
@@ -596,11 +596,11 @@ type DocumentReadyData = {
 #### `SaveDocumentData`
 ```typescript
 type SaveDocumentData = {
-  fileName: string;      // File name
-  fileType: string;      // File type (e.g., 'xlsx', 'docx')
-  binData: Uint8Array;   // Binary data
-  instanceId: string;    // Instance ID (used for event matching in multi-instance mode)
-  media?: Record<string, string>; // Media file mapping (optional)
+  fileName: string;      // 文件名
+  fileType: string;      // 文件类型（如 'xlsx', 'docx'）
+  binData: Uint8Array;   // 二进制数据
+  instanceId: string;    // 实例ID（多实例模式下用于事件匹配）
+  media?: Record<string, string>; // 媒体文件映射（可选）
 };
 ```
 
@@ -611,35 +611,37 @@ type LoadingChangeData = {
 };
 ```
 
-## Notes
+## 注意事项
 
-1. **Initialization Order**: Must call `initializeOnlyOffice()` before creating editor
-2. **Container Element**:
-   - Single-instance mode: Ensure page contains container element with ID `ONLYOFFICE_ID`
-   - Multi-instance mode: Ensure each instance uses unique container ID and uses `data-onlyoffice-container-id` attribute for precise positioning
-3. **File Types**: Ensure file extension matches file content
-4. **Event Cleanup**: Remember to remove event listeners and destroy editor when component unmounts
-5. **Async Operations**: All APIs are asynchronous, need to use `await` or `.then()` to handle
-6. **Multi-Instance Resource Isolation**: Each editor instance manages independent media resources, image uploads handled through independent `writeFile` handler functions
-7. **Container ID Uniqueness**: In multi-instance mode, each editor instance must use a unique container ID
+1. **初始化顺序**：必须先调用 `initializeOnlyOffice()` 再创建编辑器
+2. **容器元素**：
+   - 单实例模式：确保页面中存在 ID 为 `ONLYOFFICE_ID` 的容器元素
+   - 多实例模式：确保每个实例使用唯一的容器ID，并使用 `data-onlyoffice-container-id` 属性精确定位
+3. **文件类型**：确保文件扩展名与文件内容匹配
+4. **事件清理**：在组件卸载时记得取消事件监听和销毁编辑器
+5. **异步操作**：所有 API 都是异步的，需要使用 `await` 或 `.then()` 处理
+6. **多实例资源隔离**：每个编辑器实例管理独立的媒体资源，图片上传通过独立的 `writeFile` 处理函数
+7. **容器ID唯一性**：多实例模式下，每个编辑器实例必须使用唯一的容器ID
 
-## Supported File Formats
+## 支持的文件格式
 
-### Word Documents
+### Word 文档
 - `.docx` - Word 2007+
 - `.doc` - Word 97-2003
 - `.odt` - OpenDocument Text
 - `.rtf` - Rich Text Format
-- `.txt` - Plain text
+- `.txt` - 纯文本
 
-### Excel Spreadsheets
+### Excel 表格
 - `.xlsx` - Excel 2007+
 - `.xls` - Excel 97-2003
 - `.ods` - OpenDocument Spreadsheet
-- `.csv` - CSV file
+- `.csv` - CSV 文件
 
-### PowerPoint Presentations
+### PowerPoint 演示文稿
 - `.pptx` - PowerPoint 2007+
 - `.ppt` - PowerPoint 97-2003
 - `.odp` - OpenDocument Presentation
+
+
 

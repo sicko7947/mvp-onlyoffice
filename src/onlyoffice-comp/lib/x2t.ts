@@ -210,23 +210,33 @@ class X2TConverter {
               : new Request(fetchUrl, input instanceof Request ? input : undefined))
           : input;
         
-        const response = await originalFetch(fetchInput, init);
-        
-        if (!response.ok) {
-          return response;
-        }
-        
-        let arrayBuffer = await response.arrayBuffer();
-        
-        // 如果是压缩文件，需要解压
-        if (isCompressed && compressionType === 'gzip') {
-          const decompressionStream = new DecompressionStream('gzip');
-          const stream = new Response(arrayBuffer).body?.pipeThrough(decompressionStream);
-          if (stream) {
-            const decompressedResponse = new Response(stream);
-            arrayBuffer = await decompressedResponse.arrayBuffer();
-          }
-        }
+         const response = await originalFetch(fetchInput, init);
+         
+         if (!response.ok) {
+           return response;
+         }
+         
+         let arrayBuffer: ArrayBuffer;
+         
+         // 检查是否需要手动解压
+         // 如果响应头包含 Content-Encoding: gzip，浏览器会自动解压，我们不需要再解压
+         const contentEncoding = response.headers.get('Content-Encoding');
+         const needsManualDecompression = isCompressed && compressionType === 'gzip' && !contentEncoding;
+         
+         if (needsManualDecompression) {
+           // 浏览器没有自动解压，我们需要手动解压
+           console.log('onlyoffice: 📦 Manually decompressing...');
+           const blob = await response.blob();
+           const stream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
+           arrayBuffer = await new Response(stream).arrayBuffer();
+           console.log('onlyoffice: ✅ Decompressed:', blob.size, '→', arrayBuffer.byteLength, 'bytes');
+         } else {
+           // 浏览器已自动解压或文件本身未压缩
+           if (contentEncoding) {
+             console.log('onlyoffice: ✅ Browser auto-decompressed (Content-Encoding:', contentEncoding + ')');
+           }
+           arrayBuffer = await response.arrayBuffer();
+         }
         
         // 缓存到 IndexedDB（使用原始 URL 作为 key，存储解压后的数据）
         (this as any).cacheWasm(url, arrayBuffer).catch((err: any) => {
