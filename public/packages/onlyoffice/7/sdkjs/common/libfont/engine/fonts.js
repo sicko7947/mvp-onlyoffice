@@ -1,5 +1,6 @@
 !(function (t, r) {
   var e = t.AscFonts;
+  return
   t.NATIVE_EDITOR_ENJINE &&
     (t.setImmediate = function (t) {
       t();
@@ -928,5 +929,6 @@
         st
       );
     }),
-    e.onLoadModule());
+    e.onLoadModule()
+  );
 })(window, void 0);
