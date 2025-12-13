@@ -284,6 +284,64 @@ npm run dev
 # 访问 http://localhost:3001
 ```
 
+## 🛠️ 构建工具
+
+### 文件压缩脚本 (`scripts/minify.js`)
+
+用于压缩文件夹中文件的工具脚本（排除 WASM 文件），可有效减少打包体积。该脚本会递归处理目录，压缩 JavaScript、HTML、CSS 等文本类文件。
+
+#### 功能特性
+
+- **多格式支持**: 压缩 `.js`、`.html`、`.mjs`、`.cjs`、`.ts`、`.jsx`、`.tsx`、`.css` 文件
+- **智能压缩**:
+  - JavaScript/TypeScript: 使用 `terser` 进行压缩（不混淆变量名，避免破坏代码）
+  - CSS: 使用 `postcss` + `cssnano` 进行优化
+  - HTML: 使用 `html-minifier-terser` 进行压缩
+- **安全处理**: 压缩失败时自动回退为复制原文件
+- **详细统计**: 提供完整的压缩统计信息，包括文件数量和体积减少百分比
+- **保留 WASM 文件**: 自动跳过 WASM 文件，防止文件损坏
+
+#### 使用方法
+
+```bash
+# 使用默认路径（从版本 7 压缩到 7-minify）
+node scripts/minify.js
+
+# 指定自定义源目录和目标目录
+node scripts/minify.js <源目录> <目标目录>
+
+# 示例：将文件从一个目录压缩到另一个目录
+node scripts/minify.js ./public/packages/onlyoffice/7 ./public/packages/onlyoffice/7-minify
+```
+
+#### 默认路径
+
+- **源目录**: `public/packages/onlyoffice/7`
+- **目标目录**: `public/packages/onlyoffice/7-minify`
+
+#### 压缩配置
+
+- **JavaScript/TypeScript**: 
+  - 移除注释
+  - 保留 console/debugger 语句
+  - 不混淆变量名（确保 OnlyOffice SDK 安全）
+- **CSS**: 
+  - 通过 cssnano 进行完整 CSS 优化
+- **HTML**: 
+  - 移除注释
+  - 压缩空白字符
+  - 保留属性引号和结构
+
+#### 输出信息
+
+脚本会提供实时进度更新和最终统计摘要，包括：
+- 处理的总文件数
+- 压缩的文件数量
+- 复制的文件数量
+- 原始总大小
+- 压缩后总大小
+- 总体体积减少百分比
+
 ## 📝 项目结构
 
 ```

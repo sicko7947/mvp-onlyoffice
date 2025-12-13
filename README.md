@@ -284,6 +284,64 @@ npm run dev
 # Access http://localhost:3001
 ```
 
+## 🛠️ Build Tools
+
+### File Compression Script (`scripts/minify.js`)
+
+A utility script for compressing files in a folder (excluding WASM files) to reduce bundle size. This script recursively processes directories and compresses JavaScript, HTML, CSS, and other text-based files.
+
+#### Features
+
+- **Multi-format Support**: Compresses `.js`, `.html`, `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.css` files
+- **Smart Compression**:
+  - JavaScript/TypeScript: Uses `terser` for minification (without variable name mangling to avoid breaking code)
+  - CSS: Uses `postcss` + `cssnano` for optimization
+  - HTML: Uses `html-minifier-terser` for minification
+- **Safe Processing**: Automatically falls back to copying original files if compression fails
+- **Detailed Statistics**: Provides comprehensive compression statistics including file counts and size reduction percentages
+- **WASM Files Preserved**: Automatically skips WASM files to prevent corruption
+
+#### Usage
+
+```bash
+# Use default paths (compresses from version 7 to 7-minify)
+node scripts/minify.js
+
+# Specify custom source and target directories
+node scripts/minify.js <sourceDir> <targetDir>
+
+# Example: Compress files from one directory to another
+node scripts/minify.js ./public/packages/onlyoffice/7 ./public/packages/onlyoffice/7-minify
+```
+
+#### Default Paths
+
+- **Source Directory**: `public/packages/onlyoffice/7`
+- **Target Directory**: `public/packages/onlyoffice/7-minify`
+
+#### Compression Configuration
+
+- **JavaScript/TypeScript**: 
+  - Removes comments
+  - Preserves console/debugger statements
+  - No variable name mangling (safe for OnlyOffice SDK)
+- **CSS**: 
+  - Full CSS optimization via cssnano
+- **HTML**: 
+  - Removes comments
+  - Collapses whitespace
+  - Preserves attribute quotes and structure
+
+#### Output
+
+The script provides real-time progress updates and a final summary including:
+- Total files processed
+- Number of compressed files
+- Number of copied files
+- Original total size
+- Compressed total size
+- Overall size reduction percentage
+
 ## 📝 Project Structure
 
 ```
