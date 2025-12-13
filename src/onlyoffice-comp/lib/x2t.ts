@@ -479,13 +479,68 @@ class X2TConverter {
   }
 
   /**
-   * 使用 SheetJS 库将 CSV 转换为 XLSX 格式
-   * 这是解决 x2t 可能不支持直接转换 CSV 的变通方法
+   * 分块解析 CSV 行（处理引号内的换行符）
+   */
+  private parseCsvLines(csvText: string, startIndex: number, maxLines: number): { lines: string[]; nextIndex: number } {
+    const lines: string[] = [];
+    let currentIndex = startIndex;
+    let inQuotes = false;
+    let lineStart = startIndex;
+    let lineCount = 0;
+
+    while (currentIndex < csvText.length && lineCount < maxLines) {
+      const char = csvText[currentIndex];
+      const nextChar = currentIndex + 1 < csvText.length ? csvText[currentIndex + 1] : '';
+
+      if (char === '"') {
+        // 处理转义的引号 ""
+        if (nextChar === '"') {
+          currentIndex += 2;
+          continue;
+        }
+        // 切换引号状态
+        inQuotes = !inQuotes;
+      } else if (char === '\n' && !inQuotes) {
+        // 找到行尾（不在引号内）
+        const line = csvText.substring(lineStart, currentIndex);
+        lines.push(line);
+        lineCount++;
+        lineStart = currentIndex + 1;
+      } else if (char === '\r' && nextChar === '\n' && !inQuotes) {
+        // 处理 Windows 换行符 \r\n
+        const line = csvText.substring(lineStart, currentIndex);
+        lines.push(line);
+        lineCount++;
+        currentIndex++; // 跳过 \r
+        lineStart = currentIndex + 1;
+      }
+
+      currentIndex++;
+    }
+
+    // 处理文件末尾：如果还有未处理的内容，且不在引号内，添加最后一行
+    if (lineStart < csvText.length && currentIndex >= csvText.length && !inQuotes) {
+      const lastLine = csvText.substring(lineStart);
+      if (lastLine.trim().length > 0) {
+        lines.push(lastLine);
+      }
+      lineStart = csvText.length;
+    }
+
+    return { lines, nextIndex: lineStart };
+  }
+
+  /**
+   * 使用 SheetJS 库将 CSV 转换为 XLSX 格式（分块处理）
+   * 这是解决 x2t 不支持直接转换 CSV 的变通方法
    */
   private async convertCsvToXlsx(csvData: Uint8Array, fileName: string): Promise<File> {
     try {
       // 加载 xlsx 库
       const XLSX = await this.loadXlsxLibrary();
+
+      const fileSizeMB = csvData.length / 1024 / 1024;
+      console.log('onlyoffice: Converting CSV to XLSX, file size:', fileSizeMB.toFixed(2), 'MB');
 
       // 移除 UTF-8 BOM（如果存在）
       let csvText: string;
@@ -500,8 +555,146 @@ class X2TConverter {
         }
       }
 
-      // 使用 SheetJS 解析 CSV
-      const workbook = XLSX.read(csvText, { type: 'string', raw: false });
+      const totalLength = csvText.length;
+      console.log('onlyoffice: CSV text length:', totalLength, 'characters');
+
+      // 检查是否需要分块处理
+      const estimatedLines = (csvText.match(/\n/g) || []).length + 1;
+      const CHUNK_SIZE = 100000; // 每次处理 10 万行
+      const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+      
+      // 检查是否有超长行（可能包含超长单元格）
+      const lines = csvText.split(/\r?\n/);
+      const hasLongLines = lines.some(line => line.length > this.MAX_CELL_LENGTH);
+      
+      const needsChunking = 
+        csvData.length > LARGE_FILE_THRESHOLD || 
+        estimatedLines > CHUNK_SIZE ||
+        hasLongLines;
+      
+      if (hasLongLines) {
+        console.log('onlyoffice: CSV contains lines exceeding cell length limit, using chunk processing');
+      }
+
+      let workbook: any;
+
+      if (needsChunking) {
+        console.log('onlyoffice: Large CSV detected, using chunk processing. Estimated lines:', estimatedLines);
+        
+        // 分块处理
+        workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.aoa_to_sheet([]); // 创建空工作表
+        
+        let currentIndex = 0;
+        let isFirstChunk = true;
+        let headers: string[] = [];
+
+        while (currentIndex < csvText.length) {
+          // 解析一块数据
+          const { lines, nextIndex } = this.parseCsvLines(csvText, currentIndex, CHUNK_SIZE);
+          
+          // 如果没有解析到行，且已经到达文件末尾，退出循环
+          if (lines.length === 0 && nextIndex >= csvText.length) {
+            break;
+          }
+
+          // 解析 CSV 行（处理引号和逗号）
+          const rows: any[][] = [];
+          for (const line of lines) {
+            if (line.trim() === '') continue; // 跳过空行
+            
+            const row = this.parseCsvRow(line);
+            if (row.length > 0) {
+              // 确保所有单元格文本都符合 Excel 限制
+              const sanitizedRow = row.map(cell => {
+                if (typeof cell === 'string' && cell.length > this.MAX_CELL_LENGTH) {
+                  return this.truncateCellText(cell);
+                }
+                return cell;
+              });
+              rows.push(sanitizedRow);
+            }
+          }
+
+          // 如果有数据行，添加到工作表
+          if (rows.length > 0) {
+            // 第一块：提取表头
+            if (isFirstChunk) {
+              headers = rows[0];
+              XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+              isFirstChunk = false;
+              
+              // 如果有数据行，继续处理
+              if (rows.length > 1) {
+                const dataRows = rows.slice(1);
+                const lastRow = XLSX.utils.decode_range(worksheet['!ref'] || 'A1').e.r + 1;
+                XLSX.utils.sheet_add_aoa(worksheet, dataRows, { origin: `A${lastRow + 1}` });
+              }
+            } else {
+              // 后续块：直接添加数据
+              const lastRow = XLSX.utils.decode_range(worksheet['!ref'] || 'A1').e.r + 1;
+              XLSX.utils.sheet_add_aoa(worksheet, rows, { origin: `A${lastRow + 1}` });
+            }
+          }
+
+          // 如果已经到达文件末尾，退出循环
+          if (nextIndex >= csvText.length) {
+            break;
+          }
+
+          currentIndex = nextIndex;
+          
+          // 更新进度
+          const progress = ((currentIndex / totalLength) * 100).toFixed(1);
+          console.log(`onlyoffice: Processed ${progress}% of CSV file`);
+        }
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+        console.log('onlyoffice: CSV chunk processing complete');
+      } else {
+        // 小文件：直接处理
+        console.log('onlyoffice: Small CSV file, processing directly');
+        try {
+          workbook = XLSX.read(csvText, {
+            type: 'string',
+            raw: false,
+            dense: false,
+          });
+          
+          // 检查并修复超长单元格
+          const sheetNames = workbook.SheetNames;
+          for (const sheetName of sheetNames) {
+            const worksheet = workbook.Sheets[sheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            for (let row = range.s.r; row <= range.e.r; row++) {
+              for (let col = range.s.c; col <= range.e.c; col++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+                const cell = worksheet[cellAddress];
+                
+                if (cell && cell.v && typeof cell.v === 'string' && cell.v.length > this.MAX_CELL_LENGTH) {
+                  console.warn(`onlyoffice: Truncating cell ${cellAddress}, length: ${cell.v.length}`);
+                  cell.v = this.truncateCellText(cell.v);
+                  // 更新 t 类型为字符串
+                  cell.t = 's';
+                }
+              }
+            }
+          }
+        } catch (directError: any) {
+          // 如果直接处理失败（可能是超长单元格问题），记录错误
+          const errorMsg = directError.message || String(directError);
+          if (errorMsg.includes('32767') || errorMsg.includes('Text length')) {
+            console.warn('onlyoffice: Direct processing failed due to cell length limit:', errorMsg);
+            throw new Error(
+              `CSV 文件包含超过 32767 字符的单元格。` +
+              `Excel 单元格最大文本长度为 32767 字符。` +
+              `请使用分块处理模式或检查 CSV 文件中的数据。`
+            );
+          }
+          throw directError;
+        }
+      }
 
       // 转换为 XLSX 二进制格式
       const xlsxBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
@@ -512,11 +705,75 @@ class X2TConverter {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('onlyoffice: CSV to XLSX conversion failed:', errorMessage);
+      
+      // 检查是否是 "Invalid array length" 错误
+      if (errorMessage.includes('Invalid array length') || errorMessage.includes('array length')) {
+        throw new Error(
+          `CSV 文件过大，无法转换为 XLSX 格式。`
+        );
+      }
+      
       throw new Error(
-        `Failed to convert CSV to XLSX: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
-          'Please convert your CSV file to XLSX format manually and try again.',
+        `Failed to convert CSV to XLSX: ${errorMessage}. ` +
+          'Please ensure your CSV file is properly formatted and not too large, ' +
+          'or convert it to XLSX format manually and try again.',
       );
     }
+  }
+
+  /**
+   * Excel 单元格最大文本长度限制
+   */
+  private readonly MAX_CELL_LENGTH = 32767;
+
+  /**
+   * 截断文本以符合 Excel 单元格长度限制
+   */
+  private truncateCellText(text: string): string {
+    if (text.length <= this.MAX_CELL_LENGTH) {
+      return text;
+    }
+    // 截断并添加提示信息
+    const truncated = text.substring(0, this.MAX_CELL_LENGTH - 50);
+    return truncated + '\n...[文本已截断，原始长度: ' + text.length + ' 字符]';
+  }
+
+  /**
+   * 解析 CSV 行（处理引号和逗号）
+   */
+  private parseCsvRow(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = i + 1 < line.length ? line[i + 1] : '';
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // 转义的引号
+          current += '"';
+          i++; // 跳过下一个引号
+        } else {
+          // 切换引号状态
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // 字段分隔符（不在引号内）
+        // 检查并截断超长文本
+        result.push(this.truncateCellText(current));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    // 添加最后一个字段（检查并截断）
+    result.push(this.truncateCellText(current));
+    return result;
   }
 
   /**
@@ -539,8 +796,42 @@ class X2TConverter {
         if (data.length === 0) {
           throw new Error('CSV file is empty');
         }
-        console.log('CSV file detected. Converting to XLSX format...');
-        console.log('CSV file size:', data.length, 'bytes');
+        
+        // 检测文件实际格式：XLSX 文件是 ZIP 格式，文件头是 PK (0x50 0x4B)
+        // 如果文件实际上是 XLSX/ZIP 格式，直接按 XLSX 处理
+        const isZipFormat = data.length >= 2 && data[0] === 0x50 && data[1] === 0x4B;
+        
+        if (isZipFormat) {
+          console.log('onlyoffice: File has .csv extension but is actually XLSX/ZIP format, treating as XLSX');
+          // 按 XLSX 文件处理
+          const sanitizedName = this.sanitizeFileName(fileName.replace(/\.csv$/i, '.xlsx'));
+          const inputPath = `/working/${sanitizedName}`;
+          const outputPath = `${inputPath}.bin`;
+
+          // 将 XLSX 文件写入虚拟文件系统
+          this.x2tModule!.FS.writeFile(inputPath, data);
+
+          // 创建转换参数
+          const params = this.createConversionParams(inputPath, outputPath, '');
+          this.x2tModule!.FS.writeFile('/working/params.xml', params);
+
+          // 执行转换
+          this.executeConversion('/working/params.xml');
+
+          // 读取转换结果
+          const result = this.x2tModule!.FS.readFile(outputPath);
+          const media = this.readMediaFiles();
+
+          return {
+            fileName: this.sanitizeFileName(fileName),
+            type: documentType,
+            bin: result,
+            media,
+          };
+        }
+        
+        console.log('onlyoffice: CSV file detected. Converting to XLSX format...');
+        console.log('onlyoffice: CSV file size:', data.length, 'bytes');
 
         // 先将 CSV 转换为 XLSX
         try {
