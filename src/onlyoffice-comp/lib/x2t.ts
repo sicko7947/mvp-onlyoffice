@@ -1374,7 +1374,10 @@ function createOnSaveHandler(manager: EditorManager) {
 
       // 通过 eventbus 通知，包含实例ID
       onlyofficeEventbus.emit(ONLYOFFICE_EVENT_KEYS.SAVE_DOCUMENT, result);
-
+      manager.get()?.sendCommand({
+        command: 'asc_onSaveCallback',
+        data: { err_code: 0 },
+      })
       return result;
     }
 
