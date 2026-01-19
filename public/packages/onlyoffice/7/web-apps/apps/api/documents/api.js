@@ -113,7 +113,7 @@
             ((o = /^(?:(pdf|djvu|xps|oxps))$/.exec(a.document.fileType)) &&
               'string' == typeof o[1] &&
               (a.editorConfig.canUseHistory = !1),
-            (a.document.title && '' != a.document.title) || (a.document.title = 'Unnamed.' + a.document.fileType),
+            
             a.document.key)
           ) {
             if ('string' != typeof a.document.key)

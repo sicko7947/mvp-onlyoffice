@@ -61943,7 +61943,6 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
               });
             },
             onDocumentName: function (t) {
-              ((this.document.title = t), this.rendered && this.panels.info.updateInfo(this.document));
             },
             isVisible: function () {
               return !this.$el.is(':hidden');
@@ -66126,7 +66125,6 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
                 ((t = this.defaultTitleText),
                 b && !_.isEmpty(b.getDocumentCaption()) && (t = b.getDocumentCaption() + (t ? ' - ' : '') + t),
                 e && (clearTimeout(this._state.timerCaption), _.isUndefined(t) || (t = '* ' + t)),
-                window.parent.document.title != t && (window.parent.document.title = t),
                 this._isDocReady && this._state.isDocModified !== e && Common.Gateway.setDocumentModified(e),
                 e &&
                   (!this._state.fastCoauth || this._state.usersCount < 2) &&
@@ -66505,7 +66503,6 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
               (this.api.asc_setDocumentName(t), b.setDocumentCaption(t), this.updateWindowTitle(!0));
             },
             onMeta: function (t) {
-              (b.setDocumentCaption(t.title), this.updateWindowTitle(!0), (this.document.title = t.title));
               var e = this.getApplication().getController('LeftMenu').getView('LeftMenu').getMenu('file');
               (e.loadDocument({ doc: this.document }),
                 e.panels && e.panels.info && e.panels.info.updateInfo(this.document),

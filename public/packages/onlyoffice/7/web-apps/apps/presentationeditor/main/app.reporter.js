@@ -61,7 +61,6 @@ var reqerr;
         skin: localStorage.getItem('ui-theme-id'),
       }),
       t = function (e) {
-        e && (window.document.title += ' - ' + e);
       };
     (r.asc_registerCallback('asc_onDocumentContentReady', function () {
       (r.SetDrawingFreeze(!1), $('#loading-mask').hide().remove());
