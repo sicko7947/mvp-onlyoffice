@@ -2,13 +2,21 @@
 
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
-import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
-import { getOnlyOfficeLang, getCurrentLang, setCurrentLang } from '@/onlyoffice-comp/lib/document-state';
-import { editorManagerFactory, EditorManager } from '@/onlyoffice-comp/lib/editor-manager';
-import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_LANG_KEY } from '@/onlyoffice-comp/lib/const';
+import {
+  convertBinToDocument,
+  createEditorView,
+  initializeOnlyOffice,
+  getOnlyOfficeLang,
+  getCurrentLang,
+  setCurrentLang,
+  editorManagerFactory,
+  EditorManager,
+  ONLYOFFICE_EVENT_KEYS,
+  FILE_TYPE,
+  ONLYOFFICE_LANG_KEY,
+  onlyofficeEventbus,
+} from '@/onlyoffice-comp';
 import Loading from '@/components/Loading';
-import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 
 function MultiInstancePageContent() {
   const router = useRouter();

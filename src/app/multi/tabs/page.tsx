@@ -1,11 +1,16 @@
 'use client';
 
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { createEditorView, convertBinToDocument } from '@/onlyoffice-comp/lib/x2t';
-import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
-import { getOnlyOfficeLang } from '@/onlyoffice-comp/lib/document-state';
-import { editorManagerFactory, EditorManager } from '@/onlyoffice-comp/lib/editor-manager';
-import { FILE_TYPE, ONLYOFFICE_LANG_KEY } from '@/onlyoffice-comp/lib/const';
+import {
+  createEditorView,
+  convertBinToDocument,
+  initializeOnlyOffice,
+  getOnlyOfficeLang,
+  editorManagerFactory,
+  EditorManager,
+  FILE_TYPE,
+  ONLYOFFICE_LANG_KEY,
+} from '@/onlyoffice-comp';
 import Loading from '@/components/Loading';
 
 interface TabCacheItem {
