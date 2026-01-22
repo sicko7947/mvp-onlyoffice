@@ -2,14 +2,24 @@
 
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { convertBinToDocument, createEditorView } from '@/onlyoffice-comp/lib/x2t';
-
-import { initializeOnlyOffice } from '@/onlyoffice-comp/lib/utils';
-import { setDocmentObj, getDocmentObj, getOnlyOfficeLang, getCurrentLang, setCurrentLang } from '@/onlyoffice-comp/lib/document-state';
-import { editorManager } from '@/onlyoffice-comp/lib/editor-manager';
-import { ONLYOFFICE_EVENT_KEYS, FILE_TYPE, ONLYOFFICE_ID, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CONTAINER_CONFIG } from '@/onlyoffice-comp/lib/const';
+import {
+  convertBinToDocument,
+  createEditorView,
+  initializeOnlyOffice,
+  setDocmentObj,
+  getDocmentObj,
+  getOnlyOfficeLang,
+  getCurrentLang,
+  setCurrentLang,
+  editorManager,
+  ONLYOFFICE_EVENT_KEYS,
+  FILE_TYPE,
+  ONLYOFFICE_ID,
+  ONLYOFFICE_LANG_KEY,
+  ONLYOFFICE_CONTAINER_CONFIG,
+  onlyofficeEventbus,
+} from '@/onlyoffice-comp';
 import Loading from '@/components/Loading';
-import { onlyofficeEventbus } from '@/onlyoffice-comp/lib/eventbus';
 
 function ExcelPageContent() {
   const router = useRouter();
