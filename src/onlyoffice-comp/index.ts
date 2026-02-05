@@ -29,3 +29,13 @@ export {
 
 // 从 eventbus.ts 导出
 export { onlyofficeEventbus } from './lib/eventbus';
+
+export {
+  onlyOfficeServiceClient,
+  OnlyOfficeServiceClient,
+  type CreateEditorOptions,
+  type EditorInstance,
+  type EventCallback,
+  type MessageType,
+  type ServiceMessage,
+} from './service-client';

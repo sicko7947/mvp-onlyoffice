@@ -13,6 +13,7 @@ import {
   GithubOutlined,
   MenuOutlined,
   CloseOutlined,
+  CodeOutlined,
 } from '@ant-design/icons'
 import './styles.css'
 
@@ -72,6 +73,18 @@ const menuItems: MenuProps['items'] = [
       },
     ],
   },
+  {
+    key: '/service',
+    icon: <CodeOutlined />,
+    label: 'Service',
+    children: [
+      {
+        key: '/service/onlyoffice',
+        icon: <FolderOutlined />,
+        label: 'iframe Service',
+      },
+    ],
+  },
 ]
 
 interface StudioLayoutProps {
@@ -95,6 +108,7 @@ export default function StudioLayout({ children }: StudioLayoutProps) {
       '/ppt/base': { selected: '/ppt/base', parent: '/ppt' },
       '/multi/base': { selected: '/multi/base', parent: '/multi' },
       '/multi/tabs': { selected: '/multi/tabs', parent: '/multi' },
+      '/demo/onlyoffice': { selected: '/demo/onlyoffice', parent: '/demo' },
     }
 
     // 精确匹配路径

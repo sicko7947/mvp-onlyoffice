@@ -1,8 +1,4 @@
-'use client'
-
-import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
-import StudioLayout from '@/components/StudioLayout';
+import ClientLayoutWrapper from './ClientLayoutWrapper';
 import "./globals.css";
 
 export default function RootLayout({
@@ -10,15 +6,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 设置全局 document.title
-  useEffect(() => {
-    document.title = 'OnlyOffice MVP';
-  }, []);
-
   return (
     <html lang="zh-CN">
       <body className="antialiased">
-        <StudioLayout>{children}</StudioLayout>
+        <ClientLayoutWrapper>
+          {children}
+        </ClientLayoutWrapper>
       </body>
     </html>
   );
