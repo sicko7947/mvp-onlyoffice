@@ -19,10 +19,19 @@ export const ONLYOFFICE_CONTAINER_CONFIG = {
     },
 } as const;
 
+// Bundle version selector. Override via NEXT_PUBLIC_ONLYOFFICE_VERSION at build time
+// to opt into the v9 bundle once it's been extracted (see scripts/onlyoffice-build/).
+// Default stays on '7' until v9 passes the smoke harness.
+export const ONLYOFFICE_VERSION =
+    (process.env.NEXT_PUBLIC_ONLYOFFICE_VERSION as '7' | '9' | undefined) ?? '7';
+
+const PACKAGE_BASE = `/packages/onlyoffice/${ONLYOFFICE_VERSION}`;
+
 export const ONLYOFFICE_RESOURCE = {
-    DOCUMENTS: '/packages/onlyoffice/7/web-apps/apps/api/documents/api.js',
-    X2T: '/packages/onlyoffice/7/wasm/x2t/x2t.js',
-    XLSX: '/packages/onlyoffice/7/libs/sheetjs/xlsx.full.min.js',
+    DOCUMENTS: `${PACKAGE_BASE}/web-apps/apps/api/documents/api.js`,
+    X2T: `${PACKAGE_BASE}/wasm/x2t/x2t.js`,
+    // sheetjs lives only in the v7 bundle today; v9 keeps the same vendored copy.
+    XLSX: `/packages/onlyoffice/7/libs/sheetjs/xlsx.full.min.js`,
 }
 
 // EventBus 事件名称
