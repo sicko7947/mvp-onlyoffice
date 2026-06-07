@@ -38,6 +38,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude Code local config
+.claude/
+
+# stray bun lockfile — repo standardizes on pnpm (pnpm-lock.yaml)
+bun.lock
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
