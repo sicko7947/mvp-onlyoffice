@@ -192,9 +192,9 @@ function DocsPageContent() {
                 <button
                   onClick={async () => {
                     const newReadOnly = !readOnly;
-                    setReadOnly(newReadOnly);
                     try {
                       await editorManager.setReadOnly(newReadOnly);
+                      setReadOnly(newReadOnly);
                     } catch (err) {
                       setError('切换模式失败');
                       console.error('Failed to toggle read-only mode:', err);

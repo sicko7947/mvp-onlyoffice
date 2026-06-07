@@ -31,24 +31,27 @@ docker run --rm --entrypoint /bin/sh "$IMAGE" -c \
   | tar -xf - -C "$TARGET_DIR"
 chmod -R u+w "$TARGET_DIR/web-apps" "$TARGET_DIR/sdkjs"
 
-echo ">> Generating fonts via short-lived container boot"
-# `fonts/` and `sdkjs/common/AllFonts.js` are generated at container startup
-# (postinstall hook scans /usr/share/fonts + bundled fonts). We boot the image
-# briefly, wait for the marker line, then snapshot.
-GEN_CONTAINER="oo-genfonts-$$"
+echo ">> Generating runtime assets via short-lived container boot"
+# Several assets are generated at container startup, not baked into the image:
+#   - fonts/  + sdkjs/common/AllFonts.js  (font cache scan)
+#   - sdkjs/slide/themes/themeN/  + themes.js  (compiled from src/*.pptx via x2t)
+# Boot the image, poll until all are present, then snapshot.
+GEN_CONTAINER="oo-genassets-$$"
 docker run -d --name "$GEN_CONTAINER" "$IMAGE" >/dev/null
 trap 'docker rm -f "$GEN_CONTAINER" >/dev/null 2>&1 || true' EXIT
-echo "   waiting for AllFonts generation marker..."
+echo "   waiting for fonts + themes generation (up to 2min)..."
 for _ in $(seq 1 60); do
-  if docker logs "$GEN_CONTAINER" 2>&1 | grep -q "Generating AllFonts.js, please wait...Done"; then
+  if docker exec "$GEN_CONTAINER" sh -c \
+      "test -f $SOURCE_ROOT/sdkjs/common/AllFonts.js && \
+       test -f $SOURCE_ROOT/sdkjs/slide/themes/themes.js" 2>/dev/null; then
     break
   fi
   sleep 2
 done
 docker exec "$GEN_CONTAINER" sh -c \
-  "cd $SOURCE_ROOT && tar -cf - fonts sdkjs/common/AllFonts.js" \
+  "cd $SOURCE_ROOT && tar -cf - fonts sdkjs/common/AllFonts.js sdkjs/slide/themes" \
   | tar -xf - -C "$TARGET_DIR"
-chmod -R u+w "$TARGET_DIR/fonts"
+chmod -R u+w "$TARGET_DIR/fonts" "$TARGET_DIR/sdkjs/slide/themes"
 docker rm -f "$GEN_CONTAINER" >/dev/null 2>&1 || true
 trap - EXIT
 
@@ -60,6 +63,34 @@ if [[ -f "$TARGET_DIR/web-apps/apps/api/documents/api.js.tpl" ]]; then
     "$TARGET_DIR/web-apps/apps/api/documents/api.js.tpl" \
     > "$TARGET_DIR/web-apps/apps/api/documents/api.js"
   rm "$TARGET_DIR/web-apps/apps/api/documents/api.js.tpl"
+fi
+
+echo ">> Copying service worker to package root (nginx aliases it from /)"
+# sdkjs registers a ServiceWorker at <package_root>/document_editor_service_worker.js
+# but the file actually lives under sdkjs/common/serviceworker/. Upstream nginx
+# aliases it; we just copy.
+if [[ -f "$TARGET_DIR/sdkjs/common/serviceworker/document_editor_service_worker.js" ]]; then
+  cp "$TARGET_DIR/sdkjs/common/serviceworker/document_editor_service_worker.js" \
+     "$TARGET_DIR/document_editor_service_worker.js"
+fi
+
+echo ">> Neutralizing baked-in version path injection in api.js"
+# api.js v9 calls extendAppPath() which splices "/9.3.1-/" between the package
+# root and "/web-apps/app...". Upstream nginx aliases that segment back to the
+# real dir for cache-busting; we serve flat statics so the segment 404s. Empty
+# the const so the function falls through to `return path`.
+sed -i "s|const ver = '/${DOCUMENTSERVER_VERSION}-';|const ver = '';|g" \
+  "$TARGET_DIR/web-apps/apps/api/documents/api.js"
+
+echo ">> Patching x2t.js pre-js URL constructor"
+# v9 pre-js does `new URL(myScript.getAttribute("src"))` to grab ?cache-buster
+# off its own <script> tag. getAttribute returns the raw (relative) value, so
+# URL() throws without a base. Use `.src` (resolved absolute URL) plus a base
+# arg + try/catch so it degrades to empty suffix instead of blowing up init.
+X2T_JS="$TARGET_DIR/wasm/x2t/x2t.js"
+if [[ -f "$X2T_JS" ]]; then
+  sed -i 's|const mySrc=myScript.getAttribute("src");suffix=new URL(mySrc).search|const mySrc=document.currentScript.src;try{suffix=new URL(mySrc,location.href).search}catch{suffix=""}|g' \
+    "$X2T_JS"
 fi
 
 echo ">> Writing manifest"

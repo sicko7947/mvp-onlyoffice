@@ -2,7 +2,7 @@ import { getExtensions, loadEditorApi } from './utils';
 import { g_sEmpty_bin } from './empty_bin';
 import { getDocmentObj } from './document-state';
 import { editorManager, editorManagerFactory, EditorManager } from './editor-manager';
-import { ONLYOFFICE_RESOURCE, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME } from './const';
+import { ONLYOFFICE_RESOURCE, ONLYOFFICE_EVENT_KEYS, ONLYOFFICE_CONTAINER_CONFIG, READONLY_TIMEOUT_CONFIG, ONLYOFFICE_LANG_KEY, ONLYOFFICE_CACHE_FILE, ONLYOFFICE_INDEXEDDB_NAME, ONLYOFFICE_VERSION } from './const';
 import { onlyofficeEventbus } from './eventbus';
 
 declare global {
@@ -1576,21 +1576,66 @@ export function createEditorInstance(config: {
     console.log(`[CreateEditor ${manager.getInstanceId()}] Using existing container: ${finalContainerId}`);
   }
 
+  // v9 通过 Cryptpad fork 跑 client-only：bundle 注入了
+  // `connectMockServer` + `cryptPadMessageToOO`/`cryptPadSendMessageFromOO`
+  // 钩子，文档从 `document.url`(blob URL) 走标准 auth → documentOpen 流程，
+  // 不再像 v7 那样通过 `asc_openDocument(base64)` 命令喂入。
+  const FILE_TYPE_TO_DOC_TYPE: Record<string, 'word' | 'cell' | 'slide'> = {
+    docx: 'word', doc: 'word', odt: 'word', rtf: 'word', txt: 'word',
+    xlsx: 'cell', xls: 'cell', ods: 'cell', csv: 'cell',
+    pptx: 'slide', ppt: 'slide', odp: 'slide',
+  };
+  const documentType = FILE_TYPE_TO_DOC_TYPE[fileType.toLowerCase()] || 'word';
+
+  // 把 binData 统一成 Uint8Array
+  let docBytes: Uint8Array;
+  if (binData instanceof Uint8Array) {
+    docBytes = binData;
+  } else if (binData instanceof ArrayBuffer) {
+    docBytes = new Uint8Array(binData);
+  } else if (typeof binData === 'string') {
+    // empty_bin 是 "PPTY;v1;47829;<base64>"：保留 ASCII 头部 + 解码 base64
+    const semiIdx = binData.lastIndexOf(';');
+    const b64 = semiIdx >= 0 ? binData.slice(semiIdx + 1) : binData;
+    const header = semiIdx >= 0 ? binData.slice(0, semiIdx + 1) : '';
+    const decoded = atob(b64);
+    docBytes = new Uint8Array(header.length + decoded.length);
+    for (let i = 0; i < header.length; i++) docBytes[i] = header.charCodeAt(i);
+    for (let i = 0; i < decoded.length; i++) docBytes[header.length + i] = decoded.charCodeAt(i);
+  } else {
+    docBytes = new Uint8Array(binData as ArrayBufferLike);
+  }
+  // Cryptpad wrapper auth 流会把这个 URL 当作 `Editor.bin` 喂回 sdk，sdk fetch 后开始渲染。
+  const docBlob = new Blob([docBytes as BlobPart], { type: 'application/octet-stream' });
+  const docUrl = URL.createObjectURL(docBlob);
+
+  // solo 模式的 OO user id：稳定但不需要持久化（页面 reload 重新生成可接受）。
+  const myOOId = String(Math.floor(Math.random() * 1e9));
+  const myIndex = 1;
+
   // 创建编辑器实例，使用容器ID作为编辑器ID
   const editor = new window.DocsAPI.DocEditor(finalContainerId, {
+    // api-orig.js 的 createIframe 直接用 `iframe.width = config.width`，
+    // 不传则 iframe 退回 300x150 默认尺寸。显式撑满容器。
+    width: '100%',
+    height: '100%',
+    documentType,
     document: {
       title: fileName,
-      url: fileName, // 使用文件名作为标识
+      url: docUrl,
       fileType: fileType,
+      // 每次创建新 session 都给新 key，避免 sdk 误以为是恢复已存在文档。
+      key: `mvp-${Date.now()}-${manager.getInstanceId()}`,
       permissions: {
-        // edit: !readOnly, // 根据 readOnly 参数设置编辑权限
         chat: false,
         protect: false,
         print: false,
       },
     },
     editorConfig: {
-      // mode: readOnly ? 'view' : 'edit', // 根据 readOnly 参数设置模式
+      mode: readOnly ? 'view' : 'edit',
+      // user 必填，否则 sdk 在权限校验阶段会拒绝写入。
+      user: { id: myOOId, firstname: 'User', name: 'User' },
       lang: lang,
       customization: {
          leftMenu: false, // must be deprecated. use layout.leftMenu instead
@@ -1608,7 +1653,7 @@ export function createEditorInstance(config: {
           request: false,
           label: 'Guest',
         },
-        layout: { 
+        layout: {
           header: {
               users: false, // users list button
               save: false, // save button
@@ -1621,7 +1666,6 @@ export function createEditorInstance(config: {
     events: {
       writeFile: createWriteFileHandler(manager), // 为每个实例创建独立的处理函数
       onAppReady: () => {
-        // 直接使用 editor 实例，因为此时编辑器还未注册到管理器
         // 设置媒体资源 - 使用实例特定的媒体对象
         const instanceMedia = initialMedia || {};
         if (Object.keys(instanceMedia).length > 0) {
@@ -1631,11 +1675,7 @@ export function createEditorInstance(config: {
             data: { urls: instanceMedia },
           });
         }
-        // 加载文档内容
-        editor.sendCommand({
-          command: 'asc_openDocument',
-          data: { buf: binData as any },
-        });
+        // v9: 不再手动调 openDocument()，文档由 connectMockServer 的 auth 流自动加载。
       },
       onDocumentReady: () => {
         console.log('文档加载完成：', fileName);
@@ -1645,11 +1685,87 @@ export function createEditorInstance(config: {
           fileType,
         });
       },
+      onError: (e: any) => {
+        let detail = '';
+        try { detail = JSON.stringify(e?.data ?? e); } catch { detail = String(e); }
+        console.error(`OO Error [${fileName}]:`, detail);
+      },
 
       // core: 下载 - 使用实例特定的保存处理函数
       onSave: createOnSaveHandler(manager),
     },
   });
+
+  // Cryptpad bundle 在 DocsAPI.DocEditor 上挂了 connectMockServer/sendMessageToOO。
+  // 走 mock server 后 sdk 不会再去 socket.io polling，也不再触发 K=null 崩溃。
+  // 见 /tmp/oo-editor/onlyoffice-editor/src/index.ts
+  if (ONLYOFFICE_VERSION === '9' && typeof (editor as any).connectMockServer === 'function') {
+    // CryptPad 的 api.js wrapper 在 connectMockServer 里写 window.APP.getImageURL，
+    // 而 window.APP 是 CryptPad 宿主全局，本集成里不存在。补一个空对象避免
+    // “Cannot set properties of undefined (setting 'getImageURL')” 崩溃。
+    // urlArgs 给 sdk 的 loadSdk fallback 分支用（window.parent.APP.urlArgs）。
+    const appGlobal = window as unknown as { APP?: { urlArgs?: string } };
+    appGlobal.APP = appGlobal.APP ?? { urlArgs: '' };
+    (editor as any).connectMockServer({
+      // wrapper 自己处理 type='auth' 消息（发 authChanges / auth / documentOpen），
+      // 我们只需要应付 solo 模式下其它消息类型。
+      onMessage: (msg: any) => {
+        switch (msg?.type) {
+          case 'isSaveLock':
+            (editor as any).sendMessageToOO({ type: 'saveLock', saveLock: false });
+            break;
+          case 'getLock':
+            (editor as any).sendMessageToOO({ type: 'getLock', locks: [] });
+            break;
+          case 'getMessages':
+            (editor as any).sendMessageToOO({ type: 'message' });
+            break;
+          case 'saveChanges':
+            // solo: 不广播，直接回 unSaveLock 让 sdk 关掉本地保存锁。
+            (editor as any).sendMessageToOO({ type: 'unSaveLock', index: 0, time: +new Date() });
+            break;
+          case 'unLockDocument':
+            if (msg.isSave) {
+              (editor as any).sendMessageToOO({ type: 'unSaveLock', time: -1, index: -1 });
+            }
+            break;
+          case 'openDocument':
+            // sdk 复制 slide 等动作会请求图片 URL；solo 模式没有图床，回空。
+            if (msg.message?.c === 'imgurls') {
+              (editor as any).sendMessageToOO({
+                type: 'documentOpen',
+                data: { type: 'imgurls', status: 'ok', data: { urls: [], error: 0 } },
+              });
+            }
+            break;
+          default:
+            break;
+        }
+      },
+      getParticipants: () => ({
+        index: myIndex,
+        list: [
+          // History keeper 哨兵：让 sdk 始终认为还有其他人在线，避免"独自一人"
+          // 路径触发媒体清理。
+          { id: 'hk-1', idOriginal: '0', username: 'History', indexUser: -1, connectionId: 'hk-conn', isCloseCoAuthoring: false, view: false },
+          { id: myOOId + myIndex, idOriginal: myOOId, username: 'User', indexUser: myIndex, connectionId: 'me-conn', isCloseCoAuthoring: false, view: false },
+        ],
+      }),
+      getInitialChanges: () => [],
+      // v9 图片加载路径：sdk 调用 window.parent.APP.getImageURL(oImage.src, cb)，
+      // src 是裸 RasterImageId（如 "image1.png"）。返回空串会让 sdk 回退到按 src
+      // 直接 fetch（→ 404，图片不显示）。从实例 media 映射解析 blob URL：map 的 key
+      // 形如 "media/image1.png"（见 readMediaFiles / writeFile），而 sdk 请求裸名
+      // "image1.png"，所以同时尝试裸名与 media/ 前缀。初始图 + 编辑期粘贴图都覆盖。
+      getImageURL: (name: string) => {
+        const all = { ...(initialMedia || {}), ...(manager.getMedia?.() || {}) };
+        return Promise.resolve(all[name] || all[`media/${name}`] || '');
+      },
+      onAuth: () => {
+        console.log(`[OO mock] auth ok for ${fileName}`);
+      },
+    });
+  }
 
   // 使用管理器注册编辑器实例，保存配置以便后续切换只读模式
   manager.create(editor, {
