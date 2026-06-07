@@ -41,3 +41,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# OnlyOffice runtime asset bundles (1GB+, regenerable build artifacts).
+# Produced from upstream DocumentServer + x2t WASM by scripts/onlyoffice-build/
+# (see its README). Not vendored in git — run the pipeline to materialize them.
+/public/packages/onlyoffice/7/
+/public/packages/onlyoffice/9/
