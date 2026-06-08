@@ -1746,8 +1746,10 @@ export function createEditorInstance(config: {
         index: myIndex,
         list: [
           // History keeper 哨兵：让 sdk 始终认为还有其他人在线，避免"独自一人"
-          // 路径触发媒体清理。
-          { id: 'hk-1', idOriginal: '0', username: 'History', indexUser: -1, connectionId: 'hk-conn', isCloseCoAuthoring: false, view: false },
+          // 路径触发媒体清理。view:true → 计为"观察者"而非编辑者，所以 sdk 保持
+          // 单用户(Is_SingleUser)快路径，不进协同锁模式（否则 Enter/格式等需要服务端
+          // 授予锁的操作会被 deleteIndex 回滚），同时哨兵仍在场、媒体清理不触发。
+          { id: 'hk-1', idOriginal: '0', username: 'History', indexUser: -1, connectionId: 'hk-conn', isCloseCoAuthoring: false, view: true },
           { id: myOOId + myIndex, idOriginal: myOOId, username: 'User', indexUser: myIndex, connectionId: 'me-conn', isCloseCoAuthoring: false, view: false },
         ],
       }),

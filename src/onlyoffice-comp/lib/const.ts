@@ -20,10 +20,12 @@ export const ONLYOFFICE_CONTAINER_CONFIG = {
 } as const;
 
 // Bundle version selector. Override via NEXT_PUBLIC_ONLYOFFICE_VERSION at build time
-// to opt into the v9 bundle once it's been extracted (see scripts/onlyoffice-build/).
-// Default stays on '7' until v9 passes the smoke harness.
+// to pin a specific bundle (see scripts/onlyoffice-build/).
+// Default is '9' — v9 passed the smoke harness (modify-then-download, image
+// round-trip, multi-instance export, RO toggle). v7's mock handshake does not
+// fire in client-only mode, so it stays an explicit opt-in only.
 export const ONLYOFFICE_VERSION =
-    (process.env.NEXT_PUBLIC_ONLYOFFICE_VERSION as '7' | '9' | undefined) ?? '7';
+    (process.env.NEXT_PUBLIC_ONLYOFFICE_VERSION as '7' | '9' | undefined) ?? '9';
 
 const PACKAGE_BASE = `/packages/onlyoffice/${ONLYOFFICE_VERSION}`;
 
