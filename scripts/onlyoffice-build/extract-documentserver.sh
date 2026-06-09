@@ -48,8 +48,11 @@ for _ in $(seq 1 60); do
   fi
   sleep 2
 done
+# Extra wait — themes.js appearing is the sentinel, but individual .theme files
+# may still be flushed to disk for a few seconds after. Give generation time to settle.
+sleep 8
 docker exec "$GEN_CONTAINER" sh -c \
-  "cd $SOURCE_ROOT && tar -cf - fonts sdkjs/common/AllFonts.js sdkjs/slide/themes" \
+  "cd $SOURCE_ROOT && tar --warning=no-file-changed -cf - fonts sdkjs/common/AllFonts.js sdkjs/slide/themes 2>/dev/null; true" \
   | tar -xf - -C "$TARGET_DIR"
 chmod -R u+w "$TARGET_DIR/fonts" "$TARGET_DIR/sdkjs/slide/themes"
 docker rm -f "$GEN_CONTAINER" >/dev/null 2>&1 || true
