@@ -8,21 +8,54 @@ A browser-based document processing solution built on the OnlyOffice technology 
 
 ## ⚡ Developer Quick Start
 
-> **First-time setup required.** The OnlyOffice assets (~1 GB) are not in the repo and must be built before `dev` or `build` will work.
+> **First-time setup required.** The OnlyOffice assets (~1 GB) are not stored in this repo. You must run the asset build script **once** before `dev` or `build` will work — skipping this step causes a blank page with JS errors.
+
+### Prerequisites
+
+| Tool | Required for | Install |
+|------|-------------|---------|
+| [Docker](https://docs.docker.com/get-docker/) | Asset build (`build.sh`) — pulls ~2.9 GB image once | `brew install --cask docker` |
+| [gh CLI](https://cli.github.com/) | Asset build — downloads x2t WASM release | `brew install gh && gh auth login` |
+| [bun](https://bun.sh/) | Installing JS deps + running dev server | `curl -fsSL https://bun.sh/install \| bash` |
+| `unzip`, `gzip` | Asset build | pre-installed on macOS |
+
+### Setup (run once)
 
 ```bash
-# 1. Build OnlyOffice assets (Docker required, ~2.9 GB image, pulled once)
+# 1. Clone
+git clone <repository-url>
+cd mvp-onlyoffice
+
+# 2. Build OnlyOffice assets — takes 2–5 min on first run (Docker image pull)
 ./scripts/onlyoffice-build/build.sh
 
-# 2. Install dependencies (project uses pnpm)
-pnpm install
+# 3. Install JS dependencies
+bun install
 
-# 3. Start dev server
-pnpm dev
+# 4. Start dev server
+bun dev
 # → http://localhost:3001
 ```
 
-> **Note**: `bun` and `npm` also run the dev server, but the repo locks dependencies with `pnpm-lock.yaml`. Use `pnpm install` to keep the lockfile in sync.
+### What build.sh does
+
+```
+extract-documentserver.sh   pull onlyoffice/documentserver:9.3.1, extract web-apps + sdkjs + fonts  (~1 GB)
+fetch-x2t-wasm.sh           download cryptpad/onlyoffice-x2t-wasm v9.3.0+0 release                  (~51 MB)
+strip-bundle.sh             remove help docs + PDF/Visio editors (not used in MVP)                   → ~414 MB final
+```
+
+Output lands in `public/packages/onlyoffice/9/` (gitignored — rebuild any time with `build.sh`).
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Blank page / `Cannot find module` | Assets not built | Run `./scripts/onlyoffice-build/build.sh` |
+| `docker: command not found` | Docker not installed | Install Docker Desktop |
+| `gh: command not found` | gh CLI missing | `brew install gh && gh auth login` |
+| Editor loads but documents fail to open | Version mismatch (DocumentServer vs x2t WASM) | Check `scripts/onlyoffice-build/versions.env` — both must be same minor version |
+| Font shows as fallback | Custom font not placed | Put font file in `public/packages/onlyoffice/9/fonts/<index>` (see Font Configuration) |
 
 ---
 
@@ -332,22 +365,7 @@ npm run build
 
 ### Local Development
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd mvp-onlyoffice
-
-# Build OnlyOffice assets (required — not vendored in git)
-./scripts/onlyoffice-build/build.sh
-
-# Install dependencies
-pnpm install
-
-# Start development server
-npm run dev
-
-# Access http://localhost:3001
-```
+See [Developer Quick Start](#️-developer-quick-start) at the top of this document for the full setup walkthrough including prerequisites and troubleshooting.
 
 ## 🛠️ Build Tools
 

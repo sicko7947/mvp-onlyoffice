@@ -41,8 +41,8 @@ yarn-error.log*
 # Claude Code local config
 .claude/
 
-# stray bun lockfile — repo standardizes on pnpm (pnpm-lock.yaml)
-bun.lock
+# yarn lockfile (not used)
+yarn.lock
 
 # typescript
 *.tsbuildinfo

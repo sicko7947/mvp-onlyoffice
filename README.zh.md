@@ -8,21 +8,54 @@
 
 ## ⚡ 开发者快速开始
 
-> **首次使用需要构建资源。** OnlyOffice 资源包（约 1 GB）未包含在仓库中，必须先构建才能运行 `dev` 或 `build`。
+> **首次使用需要构建资源。** OnlyOffice 资源包（约 1 GB）未存储在仓库中，**必须先运行一次资源构建脚本**，然后 `dev` 和 `build` 才能正常工作——跳过此步骤会导致页面空白并报 JS 错误。
+
+### 前置条件
+
+| 工具 | 用途 | 安装方式 |
+|------|------|---------|
+| [Docker](https://docs.docker.com/get-docker/) | 资源构建（`build.sh`）— 首次拉取约 2.9 GB 镜像 | `brew install --cask docker` |
+| [gh CLI](https://cli.github.com/) | 资源构建 — 下载 x2t WASM release | `brew install gh && gh auth login` |
+| [bun](https://bun.sh/) | 安装 JS 依赖 + 启动开发服务器 | `curl -fsSL https://bun.sh/install \| bash` |
+| `unzip`、`gzip` | 资源构建 | macOS 预装 |
+
+### 初始化（只需运行一次）
 
 ```bash
-# 1. 构建 OnlyOffice 资源（需要 Docker，镜像约 2.9 GB，首次拉取一次）
+# 1. 克隆仓库
+git clone <repository-url>
+cd mvp-onlyoffice
+
+# 2. 构建 OnlyOffice 资源 — 首次运行约 2–5 分钟（Docker 镜像拉取）
 ./scripts/onlyoffice-build/build.sh
 
-# 2. 安装依赖（项目使用 pnpm）
-pnpm install
+# 3. 安装 JS 依赖
+bun install
 
-# 3. 启动开发服务器
-pnpm dev
+# 4. 启动开发服务器
+bun dev
 # → http://localhost:3001
 ```
 
-> **注意**: `bun` 和 `npm` 也可以启动开发服务器，但仓库使用 `pnpm-lock.yaml` 锁定依赖版本，请用 `pnpm install` 安装以保持 lockfile 一致。
+### build.sh 做了什么
+
+```
+extract-documentserver.sh   拉取 onlyoffice/documentserver:9.3.1，提取 web-apps + sdkjs + fonts  (~1 GB)
+fetch-x2t-wasm.sh           下载 cryptpad/onlyoffice-x2t-wasm v9.3.0+0 release                    (~51 MB)
+strip-bundle.sh             移除帮助文档 + PDF/Visio 编辑器（MVP 不需要）                          → 最终约 414 MB
+```
+
+输出到 `public/packages/onlyoffice/9/`（已 gitignore — 随时可用 `build.sh` 重新生成）。
+
+### 常见问题排查
+
+| 现象 | 原因 | 解决方法 |
+|------|------|---------|
+| 页面空白 / `Cannot find module` | 资源未构建 | 运行 `./scripts/onlyoffice-build/build.sh` |
+| `docker: command not found` | 未安装 Docker | 安装 Docker Desktop |
+| `gh: command not found` | 未安装 gh CLI | `brew install gh && gh auth login` |
+| 编辑器加载但文档打不开 | DocumentServer 与 x2t WASM 版本不匹配 | 检查 `scripts/onlyoffice-build/versions.env`，两者必须同 minor 版本 |
+| 字体显示为回退字体 | 自定义字体未放置 | 将字体文件放到 `public/packages/onlyoffice/9/fonts/<索引号>`（见字体配置章节） |
 
 ---
 
@@ -332,22 +365,7 @@ npm run build
 
 ### 本地开发
 
-```bash
-# 克隆仓库
-git clone <repository-url>
-cd mvp-onlyoffice
-
-# 构建 OnlyOffice 资源（必须——未 vendor 至 git）
-./scripts/onlyoffice-build/build.sh
-
-# 安装依赖
-pnpm install
-
-# 启动开发服务器
-npm run dev
-
-# 访问 http://localhost:3001
-```
+请参阅文档顶部的[开发者快速开始](#️-开发者快速开始)，包含完整的前置条件、初始化步骤和常见问题排查。
 
 ## 🛠️ 构建工具
 
