@@ -19,6 +19,8 @@ echo ">> Pulling $IMAGE (skip if cached)"
 docker pull "$IMAGE"
 
 echo ">> Preparing target $TARGET_DIR"
+# Docker-extracted files are often root-owned and read-only; chmod before rm.
+chmod -R u+w "$TARGET_DIR" 2>/dev/null || true
 rm -rf "$TARGET_DIR/web-apps" "$TARGET_DIR/sdkjs" "$TARGET_DIR/fonts"
 mkdir -p "$TARGET_DIR"
 
