@@ -230,23 +230,66 @@ type DocumentReadyData = {
 
 ## 🏗️ 技术实现
 
-- **OnlyOffice SDK**: 集成 OnlyOffice 官方 JavaScript SDK，提供文档编辑核心能力
+- **OnlyOffice SDK**: 集成 OnlyOffice v9 官方 JavaScript SDK（v7 可作为可选版本），提供文档编辑核心能力
 - **WebAssembly**: 利用 x2t-wasm 模块实现文档格式转换功能
 - **客户端架构**: 所有功能模块均在浏览器环境中运行，不依赖服务端
+- **单用户模式**: Mock 协作服务器使用哨兵观察员（`hk-1`），使 SDK 进入单用户模式快速路径——所有编辑操作（换行、格式化等）无需等待服务器 lock 即可直接提交
+- **原地只读切换**: `setReadOnly()` 直接调用 SDK 的 `asc_setViewMode()`，保留未保存的编辑内容，无需销毁并重建编辑器
+
+### 版本选择
+
+项目支持 OnlyOffice v7 和 v9 两个版本：
+
+- **v9（默认）**: 推荐使用。已通过完整烟雾测试，包括格式 round-trip 转换、多实例导出隔离、原地只读切换和图像粘贴回调。
+- **v7（可选）**: 适用于遗留兼容性场景。在构建时通过环境变量指定：
+
+```bash
+NEXT_PUBLIC_ONLYOFFICE_VERSION=7 npm run build
+```
 
 ## 🚀 部署方案
 
-### Vercel 部署
+### 资源构建（必须先完成）
 
-项目已配置静态导出，可直接部署到 Vercel：
+OnlyOffice 资源包（约 1 GB）**未 vendor 至 Git 仓库**，需在本地先生成。
+
+**前置条件：**
+- Docker daemon 已运行（镜像约 2.9 GB，首次拉取一次）
+- `gh` CLI 已认证（`gh auth status`）
+- `unzip`、`gzip`、`sha512sum`（Linux/macOS 标准工具）
 
 ```bash
-# 安装依赖
-npm install
-# 或
+# 一键构建所有资源（extract → fetch x2t → strip）
+./scripts/onlyoffice-build/build.sh
+```
+
+输出至 `public/packages/onlyoffice/9/{web-apps,sdkjs,fonts,wasm}/`，并写入 `MANIFEST.txt` 记录源镜像摘要。
+
+**分阶段构建：**
+```bash
+./scripts/onlyoffice-build/extract-documentserver.sh  # web-apps + sdkjs + fonts (~1GB)
+./scripts/onlyoffice-build/fetch-x2t-wasm.sh          # WASM 转换器 (~51MB)
+./scripts/onlyoffice-build/strip-bundle.sh            # 裁剪 help/PDF/Visio → ~414MB
+```
+
+**版本锁定**（`scripts/onlyoffice-build/versions.env`）：
+```
+DOCUMENTSERVER_VERSION=9.3.1   # DocumentServer Docker 镜像版本
+X2T_WASM_TAG=v9.3.0+0          # 必须与 DOCUMENTSERVER_VERSION 同 minor
+```
+
+> **重要**: DocumentServer 和 x2t WASM 必须锁定到相同的 minor 版本（如 9.3.x ↔ v9.3.0+0）。版本不匹配会导致文档加载/保存静默失败。
+
+### Vercel 部署
+
+```bash
+# 1. 先构建资源
+./scripts/onlyoffice-build/build.sh
+
+# 2. 安装依赖
 pnpm install
 
-# 构建项目
+# 3. 构建项目
 npm run build
 
 # Vercel 会自动检测并部署
@@ -256,10 +299,11 @@ npm run build
 
 ### 静态文件部署
 
-项目支持静态导出，构建后的文件可部署到任何静态托管服务：
-
 ```bash
-# 构建静态文件
+# 1. 构建资源（必须）
+./scripts/onlyoffice-build/build.sh
+
+# 2. 构建静态文件
 npm run build
 
 # 输出目录: out/
@@ -273,9 +317,10 @@ npm run build
 git clone <repository-url>
 cd mvp-onlyoffice
 
+# 构建 OnlyOffice 资源（必须——未 vendor 至 git）
+./scripts/onlyoffice-build/build.sh
+
 # 安装依赖
-npm install
-# 或
 pnpm install
 
 # 启动开发服务器
@@ -304,43 +349,35 @@ npm run dev
 #### 使用方法
 
 ```bash
-# 使用默认路径（从版本 7 压缩到 7-minify）
-node scripts/minify.js
-
-# 指定自定义源目录和目标目录
+# 指定源目录和目标目录
 node scripts/minify.js <源目录> <目标目录>
 
-# 示例：将文件从一个目录压缩到另一个目录
-node scripts/minify.js ./public/packages/onlyoffice/7 ./public/packages/onlyoffice/7-minify
+# 示例：压缩 v9 资源包
+node scripts/minify.js ./public/packages/onlyoffice/9 ./public/packages/onlyoffice/9-minify
 ```
-
-#### 默认路径
-
-- **源目录**: `public/packages/onlyoffice/7`
-- **目标目录**: `public/packages/onlyoffice/7-minify`
 
 #### 压缩配置
 
-- **JavaScript/TypeScript**: 
-  - 移除注释
-  - 保留 console/debugger 语句
-  - 不混淆变量名（确保 OnlyOffice SDK 安全）
-- **CSS**: 
-  - 通过 cssnano 进行完整 CSS 优化
-- **HTML**: 
-  - 移除注释
-  - 压缩空白字符
-  - 保留属性引号和结构
+- **JavaScript/TypeScript**: 移除注释、保留 console/debugger 语句、不混淆变量名（确保 OnlyOffice SDK 安全）
+- **CSS**: 通过 cssnano 进行完整 CSS 优化
+- **HTML**: 移除注释、压缩空白字符、保留属性引号和结构
 
 #### 输出信息
 
-脚本会提供实时进度更新和最终统计摘要，包括：
-- 处理的总文件数
-- 压缩的文件数量
-- 复制的文件数量
-- 原始总大小
-- 压缩后总大小
-- 总体体积减少百分比
+脚本会提供实时进度更新和最终统计摘要，包括处理的总文件数、压缩/复制数量、原始与压缩后大小及总体减少百分比。
+
+### 烟雾测试脚本 (`scripts/oo-*.mjs`)
+
+通过 Chrome DevTools Protocol 驱动浏览器验证编辑器功能：
+
+| 脚本 | 测试内容 |
+|------|---------|
+| `oo-roundtrip.mjs` | DOCX/XLSX/PPTX 格式 round-trip 转换 |
+| `oo-multi-export.mjs` | 多实例导出隔离（验证无跨实例数据泄漏） |
+| `oo-ro-export.mjs` | 只读模式下导出未保存编辑 |
+| `oo-img-probe.mjs` | 图像粘贴与媒体嵌入 |
+| `oo-binfmt.mjs` | 二进制格式检测与验证 |
+| `ppt-cdp-probe.mjs` | PowerPoint 专项 CDP 探测 |
 
 ## 📝 项目结构
 
@@ -348,16 +385,16 @@ node scripts/minify.js ./public/packages/onlyoffice/7 ./public/packages/onlyoffi
 mvp-onlyoffice/
 ├── src/
 │   ├── app/              # Next.js 应用页面
-│   │   ├── excel/
-│   │   │   └── base/     # Excel 编辑器页面 (/excel/base)
-│   │   ├── docs/
-│   │   │   └── base/     # Word 编辑器页面 (/docs/base)
-│   │   ├── ppt/
-│   │   │   └── base/     # PowerPoint 编辑器页面 (/ppt/base)
+│   │   ├── excel/base/          # Excel 编辑器 (/excel/base)
+│   │   ├── docs/base/           # Word 编辑器 (/docs/base)
+│   │   ├── ppt/base/            # PowerPoint 编辑器 (/ppt/base)
 │   │   ├── multi/
-│   │   │   ├── base/     # 多实例基础演示页面 (/multi/base)
-│   │   │   └── tabs/     # 多实例 Tab 演示页面 (/multi/tabs)
-│   │   └── page.tsx      # 首页（重定向到 /excel/base）
+│   │   │   ├── base/            # 多实例基础演示 (/multi/base)
+│   │   │   └── tabs/            # 多实例 Tab 演示 (/multi/tabs)
+│   │   ├── onlyoffice-service/  # iframe 服务宿主页 (/onlyoffice-service)
+│   │   ├── service/onlyoffice/  # iframe 服务实现 (/service/onlyoffice)
+│   │   ├── smoke/               # 烟雾测试运行页 (/smoke)
+│   │   └── page.tsx             # 首页（重定向到 /excel/base）
 │   ├── onlyoffice-comp/  # OnlyOffice 组件库
 │   │   └── lib/
 │   │       ├── editor-manager.ts  # 编辑器管理器（支持多实例）
@@ -365,21 +402,37 @@ mvp-onlyoffice/
 │   │       ├── eventbus.ts        # 事件总线
 │   │       └── ...
 │   └── components/       # 通用组件
-├── public/               # 静态资源
-│   ├── web-apps/         # OnlyOffice Web 应用资源
-│   ├── sdkjs/            # OnlyOffice SDK 资源
-│   └── wasm/             # WebAssembly 转换器
-└── onlyoffice-x2t-wasm/  # x2t-wasm 源码
+├── public/
+│   └── packages/onlyoffice/
+│       └── 9/            # OnlyOffice v9 资源（由构建脚本生成，不在 git 中）
+│           ├── web-apps/ # OnlyOffice Web 应用资源
+│           ├── sdkjs/    # OnlyOffice JavaScript SDK
+│           ├── fonts/    # 字体配置
+│           └── wasm/     # x2t WebAssembly 转换器
+└── scripts/
+    ├── onlyoffice-build/ # 资源构建管线（基于 Docker）
+    │   ├── build.sh              # 一键构建（所有阶段）
+    │   ├── extract-documentserver.sh
+    │   ├── fetch-x2t-wasm.sh
+    │   ├── strip-bundle.sh
+    │   └── versions.env          # 版本锁定配置
+    ├── minify.js         # 资源包压缩脚本
+    └── oo-*.mjs          # 烟雾测试脚本（CDP 驱动）
 ```
 
 ### 页面路由说明
 
-- `/` - 首页，自动重定向到 `/excel/base`
-- `/excel/base` - Excel 电子表格编辑器（单实例模式）
-- `/docs/base` - Word 文档编辑器（单实例模式）
-- `/ppt/base` - PowerPoint 演示文稿编辑器（单实例模式）
-- `/multi/base` - 多实例基础演示，展示同时运行多个独立编辑器实例
-- `/multi/tabs` - 多实例 Tab 演示，展示带 LRU 缓存管理的多 Tab 编辑器实现
+| 路由 | 说明 |
+|------|------|
+| `/` | 首页，自动重定向到 `/excel/base` |
+| `/excel/base` | Excel 电子表格编辑器（单实例模式） |
+| `/docs/base` | Word 文档编辑器（单实例模式） |
+| `/ppt/base` | PowerPoint 演示文稿编辑器（单实例模式） |
+| `/multi/base` | 多实例基础演示，展示同时运行多个独立编辑器实例 |
+| `/multi/tabs` | 多实例 Tab 演示，展示带 LRU 缓存管理的多 Tab 编辑器 |
+| `/onlyoffice-service` | iframe 服务宿主页 |
+| `/service/onlyoffice` | iframe 服务实现（在隔离 iframe 中运行编辑器） |
+| `/smoke` | v7/v9 功能验证的烟雾测试运行页 |
 
 ## 🔤 字体配置
 
@@ -391,17 +444,17 @@ mvp-onlyoffice/
 
 如需添加字体，请按以下步骤操作：
 
-1. 查看 `public/sdkjs/common/AllFonts.js` 文件
+1. 查看 `public/packages/onlyoffice/9/sdkjs/common/AllFonts.js` 文件
 2. 在 `__fonts_files` 数组中查找目标字体的索引号
-3. 将字体文件放置到 `public/fonts/` 目录
+3. 将字体文件放置到 `public/packages/onlyoffice/9/fonts/` 目录
 4. 将文件重命名为对应的索引号（无需扩展名）
 
 **示例：添加 Arial 字体**
 
-- Arial 常规字体索引为 `223` → 放置文件为 `public/fonts/223`
-- Arial 粗体索引为 `226` → 放置文件为 `public/fonts/226`
-- Arial 斜体索引为 `224` → 放置文件为 `public/fonts/224`
-- Arial 粗斜体索引为 `225` → 放置文件为 `public/fonts/225`
+- Arial 常规字体索引为 `223` → 放置文件为 `public/packages/onlyoffice/9/fonts/223`
+- Arial 粗体索引为 `226` → 放置文件为 `public/packages/onlyoffice/9/fonts/226`
+- Arial 斜体索引为 `224` → 放置文件为 `public/packages/onlyoffice/9/fonts/224`
+- Arial 粗斜体索引为 `225` → 放置文件为 `public/packages/onlyoffice/9/fonts/225`
 
 **重要提示**: 请确保使用的字体文件符合相关许可协议，仅使用开源字体或已获得授权的字体。
 

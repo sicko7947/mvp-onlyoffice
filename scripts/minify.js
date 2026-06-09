@@ -151,8 +151,8 @@ async function minifyFolder(sourceDir, targetDir) {
 
 // 从命令行参数获取路径
 const args = process.argv.slice(2);
-const sourceDir = args[0] || path.resolve(__dirname, '../public/packages/onlyoffice/7');
-const targetDir = args[1] || path.resolve(__dirname, '../public/packages/onlyoffice/7-minify');
+const sourceDir = args[0] || path.resolve(__dirname, '../public/packages/onlyoffice/9');
+const targetDir = args[1] || path.resolve(__dirname, '../public/packages/onlyoffice/9-minify');
 
 // 验证源目录是否存在
 if (!fs.existsSync(sourceDir)) {

@@ -230,23 +230,66 @@ type DocumentReadyData = {
 
 ## 🏗️ Technical Implementation
 
-- **OnlyOffice SDK**: Integrates OnlyOffice official JavaScript SDK, providing core document editing capabilities
+- **OnlyOffice SDK**: Integrates OnlyOffice v9 JavaScript SDK (v7 available as opt-in), providing core document editing capabilities
 - **WebAssembly**: Uses x2t-wasm module to implement document format conversion functionality
 - **Client-Side Architecture**: All functional modules run in the browser environment without server dependencies
+- **Single-User Mode**: Mock collaboration server uses a sentinel observer (`hk-1`) so the SDK enters fast-path single-user mode — all edit operations (newline, formatting, etc.) commit without a server lock round-trip
+- **In-Place Read-Only Toggle**: `setReadOnly()` calls the SDK's `asc_setViewMode()` directly, preserving unsaved edits without destroying/recreating the editor
+
+### Version Selection
+
+The project supports OnlyOffice v7 and v9:
+
+- **v9 (default)**: Recommended. Passes the full smoke test suite including round-trip conversion, scoped multi-instance exports, in-place read-only toggle, and image paste callbacks.
+- **v7 (opt-in)**: Available for legacy compatibility. Set at build time via environment variable:
+
+```bash
+NEXT_PUBLIC_ONLYOFFICE_VERSION=7 npm run build
+```
 
 ## 🚀 Deployment Options
 
-### Vercel Deployment
+### Asset Build Pipeline (Required First Step)
 
-The project is configured for static export and can be deployed directly to Vercel:
+The OnlyOffice asset bundle (~1 GB) is **not vendored** in the repository. You must build it locally before running or deploying.
+
+**Prerequisites:**
+- Docker daemon running (image is ~2.9 GB, pulled once)
+- `gh` CLI authenticated (`gh auth status`)
+- `unzip`, `gzip`, `sha512sum` (standard on Linux/macOS)
 
 ```bash
-# Install dependencies
-npm install
-# or
+# Build all assets (runs extract → fetch x2t → strip)
+./scripts/onlyoffice-build/build.sh
+```
+
+This outputs to `public/packages/onlyoffice/9/{web-apps,sdkjs,fonts,wasm}/` and writes a `MANIFEST.txt` recording the source image digest.
+
+**Individual stages:**
+```bash
+./scripts/onlyoffice-build/extract-documentserver.sh  # web-apps + sdkjs + fonts (~1GB)
+./scripts/onlyoffice-build/fetch-x2t-wasm.sh          # WASM converter (~51MB)
+./scripts/onlyoffice-build/strip-bundle.sh            # drop help/PDF/Visio → ~414MB
+```
+
+**Version pinning** (`scripts/onlyoffice-build/versions.env`):
+```
+DOCUMENTSERVER_VERSION=9.3.1   # DocumentServer Docker image version
+X2T_WASM_TAG=v9.3.0+0          # Must match same minor as DOCUMENTSERVER_VERSION
+```
+
+> **Important**: DocumentServer and x2t WASM must be pinned to the same minor version (e.g. 9.3.x ↔ v9.3.0+0). Mismatched versions silently break document load/save.
+
+### Vercel Deployment
+
+```bash
+# 1. Build assets first
+./scripts/onlyoffice-build/build.sh
+
+# 2. Install dependencies
 pnpm install
 
-# Build project
+# 3. Build project
 npm run build
 
 # Vercel will automatically detect and deploy
@@ -256,10 +299,11 @@ Access URL: https://mvp-onlyoffice.vercel.app/
 
 ### Static File Deployment
 
-The project supports static export, and built files can be deployed to any static hosting service:
-
 ```bash
-# Build static files
+# 1. Build assets (required)
+./scripts/onlyoffice-build/build.sh
+
+# 2. Build static files
 npm run build
 
 # Output directory: out/
@@ -273,9 +317,10 @@ npm run build
 git clone <repository-url>
 cd mvp-onlyoffice
 
+# Build OnlyOffice assets (required — not vendored in git)
+./scripts/onlyoffice-build/build.sh
+
 # Install dependencies
-npm install
-# or
 pnpm install
 
 # Start development server
@@ -304,43 +349,35 @@ A utility script for compressing files in a folder (excluding WASM files) to red
 #### Usage
 
 ```bash
-# Use default paths (compresses from version 7 to 7-minify)
-node scripts/minify.js
-
-# Specify custom source and target directories
+# Specify source and target directories
 node scripts/minify.js <sourceDir> <targetDir>
 
-# Example: Compress files from one directory to another
-node scripts/minify.js ./public/packages/onlyoffice/7 ./public/packages/onlyoffice/7-minify
+# Example: Compress v9 bundle
+node scripts/minify.js ./public/packages/onlyoffice/9 ./public/packages/onlyoffice/9-minify
 ```
-
-#### Default Paths
-
-- **Source Directory**: `public/packages/onlyoffice/7`
-- **Target Directory**: `public/packages/onlyoffice/7-minify`
 
 #### Compression Configuration
 
-- **JavaScript/TypeScript**: 
-  - Removes comments
-  - Preserves console/debugger statements
-  - No variable name mangling (safe for OnlyOffice SDK)
-- **CSS**: 
-  - Full CSS optimization via cssnano
-- **HTML**: 
-  - Removes comments
-  - Collapses whitespace
-  - Preserves attribute quotes and structure
+- **JavaScript/TypeScript**: Removes comments, preserves console/debugger statements, no variable name mangling (safe for OnlyOffice SDK)
+- **CSS**: Full CSS optimization via cssnano
+- **HTML**: Removes comments, collapses whitespace, preserves attribute quotes and structure
 
 #### Output
 
-The script provides real-time progress updates and a final summary including:
-- Total files processed
-- Number of compressed files
-- Number of copied files
-- Original total size
-- Compressed total size
-- Overall size reduction percentage
+The script provides real-time progress updates and a final summary including total files processed, compressed/copied counts, original vs. compressed size, and overall reduction percentage.
+
+### Smoke Tests (`scripts/oo-*.mjs`)
+
+Browser-driven test scripts that verify editor functionality via Chrome DevTools Protocol:
+
+| Script | What it tests |
+|--------|--------------|
+| `oo-roundtrip.mjs` | DOCX/XLSX/PPTX format round-trip conversion |
+| `oo-multi-export.mjs` | Multi-instance export isolation (no cross-instance data leakage) |
+| `oo-ro-export.mjs` | Read-only mode + export of unsaved edits |
+| `oo-img-probe.mjs` | Image paste and media embedding |
+| `oo-binfmt.mjs` | Binary format inspection and validation |
+| `ppt-cdp-probe.mjs` | PowerPoint-specific CDP probing |
 
 ## 📝 Project Structure
 
@@ -348,16 +385,16 @@ The script provides real-time progress updates and a final summary including:
 mvp-onlyoffice/
 ├── src/
 │   ├── app/              # Next.js application pages
-│   │   ├── excel/
-│   │   │   └── base/     # Excel editor page (/excel/base)
-│   │   ├── docs/
-│   │   │   └── base/     # Word editor page (/docs/base)
-│   │   ├── ppt/
-│   │   │   └── base/     # PowerPoint editor page (/ppt/base)
+│   │   ├── excel/base/          # Excel editor (/excel/base)
+│   │   ├── docs/base/           # Word editor (/docs/base)
+│   │   ├── ppt/base/            # PowerPoint editor (/ppt/base)
 │   │   ├── multi/
-│   │   │   ├── base/     # Multi-instance basic demo page (/multi/base)
-│   │   │   └── tabs/     # Multi-instance Tab demo page (/multi/tabs)
-│   │   └── page.tsx      # Home page (redirects to /excel/base)
+│   │   │   ├── base/            # Multi-instance basic demo (/multi/base)
+│   │   │   └── tabs/            # Multi-instance Tab demo (/multi/tabs)
+│   │   ├── onlyoffice-service/  # iframe service host page (/onlyoffice-service)
+│   │   ├── service/onlyoffice/  # iframe service implementation (/service/onlyoffice)
+│   │   ├── smoke/               # Smoke test runner page (/smoke)
+│   │   └── page.tsx             # Home page (redirects to /excel/base)
 │   ├── onlyoffice-comp/  # OnlyOffice component library
 │   │   └── lib/
 │   │       ├── editor-manager.ts  # Editor manager (supports multi-instance)
@@ -365,21 +402,37 @@ mvp-onlyoffice/
 │   │       ├── eventbus.ts        # Event bus
 │   │       └── ...
 │   └── components/       # Common components
-├── public/               # Static resources
-│   ├── web-apps/         # OnlyOffice Web application resources
-│   ├── sdkjs/            # OnlyOffice SDK resources
-│   └── wasm/             # WebAssembly converter
-└── onlyoffice-x2t-wasm/  # x2t-wasm source code
+├── public/
+│   └── packages/onlyoffice/
+│       └── 9/            # OnlyOffice v9 assets (generated — not in git)
+│           ├── web-apps/ # OnlyOffice web application resources
+│           ├── sdkjs/    # OnlyOffice JavaScript SDK
+│           ├── fonts/    # Font configuration
+│           └── wasm/     # x2t WebAssembly converter
+└── scripts/
+    ├── onlyoffice-build/ # Asset build pipeline (Docker-based)
+    │   ├── build.sh              # One-shot build (all stages)
+    │   ├── extract-documentserver.sh
+    │   ├── fetch-x2t-wasm.sh
+    │   ├── strip-bundle.sh
+    │   └── versions.env          # Pinned versions
+    ├── minify.js         # Bundle compression script
+    └── oo-*.mjs          # Smoke test scripts (CDP-driven)
 ```
 
-### Page Route Description
+### Page Routes
 
-- `/` - Home page, automatically redirects to `/excel/base`
-- `/excel/base` - Excel spreadsheet editor (single-instance mode)
-- `/docs/base` - Word document editor (single-instance mode)
-- `/ppt/base` - PowerPoint presentation editor (single-instance mode)
-- `/multi/base` - Multi-instance basic demo, showcasing multiple independent editor instances running simultaneously
-- `/multi/tabs` - Multi-instance Tab demo, showcasing multi-tab editor implementation with LRU cache management
+| Route | Description |
+|-------|-------------|
+| `/` | Home — redirects to `/excel/base` |
+| `/excel/base` | Excel spreadsheet editor (single-instance) |
+| `/docs/base` | Word document editor (single-instance) |
+| `/ppt/base` | PowerPoint presentation editor (single-instance) |
+| `/multi/base` | Multi-instance demo — multiple independent editors simultaneously |
+| `/multi/tabs` | Multi-instance Tab demo — LRU-cached multi-tab editor |
+| `/onlyoffice-service` | iframe service host page |
+| `/service/onlyoffice` | iframe service implementation (runs editor in isolated frame) |
+| `/smoke` | Smoke test runner for v7/v9 feature verification |
 
 ## 🔤 Font Configuration
 
@@ -391,17 +444,17 @@ This project complies with open-source licensing requirements and **does not inc
 
 To add fonts, follow these steps:
 
-1. Check the `public/sdkjs/common/AllFonts.js` file
+1. Check the `public/packages/onlyoffice/9/sdkjs/common/AllFonts.js` file
 2. Find the target font's index number in the `__fonts_files` array
-3. Place the font file in the `public/fonts/` directory
+3. Place the font file in the `public/packages/onlyoffice/9/fonts/` directory
 4. Rename the file to the corresponding index number (no extension needed)
 
 **Example: Adding Arial Font**
 
-- Arial regular font index is `223` → Place file as `public/fonts/223`
-- Arial bold index is `226` → Place file as `public/fonts/226`
-- Arial italic index is `224` → Place file as `public/fonts/224`
-- Arial bold italic index is `225` → Place file as `public/fonts/225`
+- Arial regular font index is `223` → Place file as `public/packages/onlyoffice/9/fonts/223`
+- Arial bold index is `226` → Place file as `public/packages/onlyoffice/9/fonts/226`
+- Arial italic index is `224` → Place file as `public/packages/onlyoffice/9/fonts/224`
+- Arial bold italic index is `225` → Place file as `public/packages/onlyoffice/9/fonts/225`
 
 **Important Note**: Please ensure that the font files used comply with relevant licensing agreements, only use open-source fonts or fonts with proper authorization.
 
