@@ -10,6 +10,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/versions.env"
 
+# BSD sed (macOS) requires an explicit empty backup suffix; GNU sed does not.
+if sed --version 2>/dev/null | grep -q 'GNU sed'; then
+  SED_I=(sed -i)
+else
+  SED_I=(sed -i '')
+fi
+
 IMAGE="${DOCUMENTSERVER_IMAGE}:${DOCUMENTSERVER_VERSION}"
 TARGET_DIR="$REPO_ROOT/public/packages/onlyoffice/${TARGET_VERSION_DIR}"
 SOURCE_ROOT="/var/www/onlyoffice/documentserver"
@@ -84,7 +91,7 @@ echo ">> Neutralizing baked-in version path injection in api.js"
 # root and "/web-apps/app...". Upstream nginx aliases that segment back to the
 # real dir for cache-busting; we serve flat statics so the segment 404s. Empty
 # the const so the function falls through to `return path`.
-sed -i "s|const ver = '/${DOCUMENTSERVER_VERSION}-';|const ver = '';|g" \
+"${SED_I[@]}" "s|const ver = '/${DOCUMENTSERVER_VERSION}-';|const ver = '';|g" \
   "$TARGET_DIR/web-apps/apps/api/documents/api.js"
 
 echo ">> Patching x2t.js pre-js URL constructor"
@@ -94,7 +101,7 @@ echo ">> Patching x2t.js pre-js URL constructor"
 # arg + try/catch so it degrades to empty suffix instead of blowing up init.
 X2T_JS="$TARGET_DIR/wasm/x2t/x2t.js"
 if [[ -f "$X2T_JS" ]]; then
-  sed -i 's|const mySrc=myScript.getAttribute("src");suffix=new URL(mySrc).search|const mySrc=document.currentScript.src;try{suffix=new URL(mySrc,location.href).search}catch{suffix=""}|g' \
+  "${SED_I[@]}" 's|const mySrc=myScript.getAttribute("src");suffix=new URL(mySrc).search|const mySrc=document.currentScript.src;try{suffix=new URL(mySrc,location.href).search}catch{suffix=""}|g' \
     "$X2T_JS"
 fi
 
