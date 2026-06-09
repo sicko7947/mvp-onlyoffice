@@ -6,6 +6,26 @@
 
 A browser-based document processing solution built on the OnlyOffice technology stack, supporting document viewing, editing, and conversion entirely on the client side. All operations are performed on the user's device without requiring backend services.
 
+## ⚡ Developer Quick Start
+
+> **First-time setup required.** The OnlyOffice assets (~1 GB) are not in the repo and must be built before `dev` or `build` will work.
+
+```bash
+# 1. Build OnlyOffice assets (Docker required, ~2.9 GB image, pulled once)
+./scripts/onlyoffice-build/build.sh
+
+# 2. Install dependencies (project uses pnpm)
+pnpm install
+
+# 3. Start dev server
+pnpm dev
+# → http://localhost:3001
+```
+
+> **Note**: `bun` and `npm` also run the dev server, but the repo locks dependencies with `pnpm-lock.yaml`. Use `pnpm install` to keep the lockfile in sync.
+
+---
+
 ## 🎯 Core Advantages
 
 - 🛡️ **Data Security**: Document processing is completed entirely within the browser, data never leaves the local environment

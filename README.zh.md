@@ -6,6 +6,26 @@
 
 基于 OnlyOffice 技术栈构建的浏览器端文档处理解决方案，支持在客户端完成文档的查看、编辑与转换，所有操作均在用户设备上执行，无需依赖后端服务。
 
+## ⚡ 开发者快速开始
+
+> **首次使用需要构建资源。** OnlyOffice 资源包（约 1 GB）未包含在仓库中，必须先构建才能运行 `dev` 或 `build`。
+
+```bash
+# 1. 构建 OnlyOffice 资源（需要 Docker，镜像约 2.9 GB，首次拉取一次）
+./scripts/onlyoffice-build/build.sh
+
+# 2. 安装依赖（项目使用 pnpm）
+pnpm install
+
+# 3. 启动开发服务器
+pnpm dev
+# → http://localhost:3001
+```
+
+> **注意**: `bun` 和 `npm` 也可以启动开发服务器，但仓库使用 `pnpm-lock.yaml` 锁定依赖版本，请用 `pnpm install` 安装以保持 lockfile 一致。
+
+---
+
 ## 🎯 核心优势
 
 - 🛡️ **数据安全**: 文档处理流程完全在浏览器内完成，数据不会离开本地环境
